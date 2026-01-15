@@ -1,17 +1,40 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
 
-  // Create supabase client lazily only on client side
-  const supabase = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return createClient();
+  // Initialize Supabase client on mount
+  useEffect(() => {
+    const initSupabase = async () => {
+      try {
+        // Check if env vars are set (embedded at build time)
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!url || !key) {
+          setIsConfigured(false);
+          return;
+        }
+
+        // Dynamic import to avoid issues during SSR
+        const { createBrowserClient } = await import('@supabase/ssr');
+        const client = createBrowserClient(url, key);
+        setSupabase(client);
+        setIsConfigured(true);
+      } catch (error) {
+        console.error('Failed to initialize Supabase:', error);
+        setIsConfigured(false);
+      }
+    };
+
+    initSupabase();
   }, []);
 
   const handleMagicLink = async (e: React.FormEvent) => {
@@ -56,8 +79,20 @@ export default function LoginPage() {
     }
   };
 
+  // Loading state while checking configuration
+  if (isConfigured === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-indigo-600 mb-2">Abo</h1>
+          <p className="text-gray-500">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show setup message if Supabase is not configured
-  if (!supabase) {
+  if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full">
@@ -135,7 +170,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !supabase}
               className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Envoi en cours...' : 'Recevoir un lien magique'}
@@ -153,7 +188,7 @@ export default function LoginPage() {
 
           <button
             onClick={handleGoogleLogin}
-            disabled={loading}
+            disabled={loading || !supabase}
             className="w-full py-3 bg-white border border-gray-200 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
