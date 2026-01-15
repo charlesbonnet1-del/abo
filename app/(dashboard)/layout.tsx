@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/supabase/server';
-import prisma from '@/lib/prisma';
 import { Navigation } from '@/components/nav';
 import { UserMenu } from '@/components/user-menu';
 
@@ -11,20 +10,40 @@ export default async function DashboardLayout({
 }) {
   const supabaseUser = await getUser();
 
+  // Redirect to login if not authenticated or Supabase not configured
   if (!supabaseUser) {
     redirect('/login');
   }
 
-  // Get or create user in database
-  const user = await prisma.user.upsert({
-    where: { email: supabaseUser.email! },
-    update: {},
-    create: {
-      id: supabaseUser.id,
-      email: supabaseUser.email!,
-      name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
-    },
-  });
+  // Try to get user from database
+  let user: { email: string; name: string | null } | null = null;
+
+  try {
+    // Dynamic import to avoid module-level errors
+    const prisma = (await import('@/lib/prisma')).default;
+
+    user = await prisma.user.upsert({
+      where: { email: supabaseUser.email! },
+      update: {},
+      create: {
+        id: supabaseUser.id,
+        email: supabaseUser.email!,
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
+      },
+      select: {
+        email: true,
+        name: true,
+      },
+    });
+  } catch (error) {
+    console.error('Database error:', error);
+    // If database is not configured, redirect to login with error
+    redirect('/login?error=database_not_configured');
+  }
+
+  if (!user) {
+    redirect('/login');
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
