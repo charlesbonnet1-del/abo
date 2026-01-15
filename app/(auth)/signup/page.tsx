@@ -87,7 +87,19 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      // Redirect directly after signup - use window.location for hard redirect
+      // Sign in immediately after signup to establish session
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (signInError) {
+        setMessage({ type: 'error', text: signInError.message });
+        setLoading(false);
+        return;
+      }
+
+      // Now redirect with session established
       window.location.href = '/';
       return;
     }
