@@ -9,6 +9,9 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
+    if (!supabase) {
+      return NextResponse.redirect(`${origin}/login?error=supabase_not_configured`);
+    }
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.user) {

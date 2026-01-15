@@ -56,6 +56,39 @@ export default function LoginPage() {
     }
   };
 
+  // Show setup message if Supabase is not configured
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-indigo-600 mb-2">Abo</h1>
+            <p className="text-gray-600">Ton copilote abonnements</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6 text-center">
+              Configuration requise
+            </h2>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <p className="text-amber-800 text-sm">
+                Les variables d&apos;environnement Supabase ne sont pas configurées.
+              </p>
+            </div>
+            <div className="space-y-3 text-sm text-gray-600">
+              <p>Ajoutez ces variables dans Vercel :</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code></li>
+                <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code></li>
+                <li><code className="bg-gray-100 px-1 rounded">DATABASE_URL</code></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full">
