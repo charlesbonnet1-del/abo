@@ -89,15 +89,9 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      // If email confirmation is disabled, redirect directly
-      if (data.session) {
-        router.push('/');
-      } else {
-        setMessage({
-          type: 'success',
-          text: 'Compte créé ! Vérifie ta boîte mail pour confirmer ton inscription.',
-        });
-      }
+      // Redirect directly after signup - use window.location for hard redirect
+      window.location.href = '/';
+      return;
     }
     setLoading(false);
   };
