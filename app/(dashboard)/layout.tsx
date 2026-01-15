@@ -22,13 +22,19 @@ export default async function DashboardLayout({
     // Dynamic import to avoid module-level errors
     const prisma = (await import('@/lib/prisma')).default;
 
+    const metadata = supabaseUser.user_metadata || {};
+
     user = await prisma.user.upsert({
       where: { email: supabaseUser.email! },
       update: {},
       create: {
         id: supabaseUser.id,
         email: supabaseUser.email!,
-        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
+        name: metadata.full_name || metadata.name,
+        firstName: metadata.first_name,
+        lastName: metadata.last_name,
+        company: metadata.company,
+        jobPosition: metadata.job_position,
       },
       select: {
         email: true,

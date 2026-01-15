@@ -11,6 +11,10 @@ model User {
   id                String    @id @default(cuid())
   email             String    @unique
   name              String?
+  firstName         String?
+  lastName          String?
+  company           String?
+  jobPosition       String?
   stripeAccountId   String?   @unique
   stripeAccessToken String?
   stripeConnectedAt DateTime?
