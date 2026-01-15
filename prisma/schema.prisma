@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  stripeAccountId   String?   @unique
+  stripeAccessToken String?
+  stripeConnectedAt DateTime?
+  createdAt         DateTime  @default(now())
+
+  subscribers       Subscriber[]
+  alerts            Alert[]
+  tags              Tag[]
+}
+
+model Subscriber {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeCustomerId  String
+  email             String
+  name              String?
+
+  status            SubscriberStatus @default(ACTIVE)
+  healthScore       Int?
+
+  plan              String?
+  mrr               Int              @default(0)
+  ltv               Int              @default(0)
+
+  currentPeriodEnd  DateTime?
+  cardExpiresAt     DateTime?
+
+  firstSeenAt       DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  tags              Tag[]
+  notes             Note[]
+  events            Event[]
+  actions           Action[]
+
+  @@unique([userId, stripeCustomerId])
+  @@index([userId])
+}
+
+enum SubscriberStatus {
+  TRIAL
+  ACTIVE
+  AT_RISK
+  CHURNED
+}
+
+model Event {
+  id           String      @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber  @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  type         EventType
+  source       EventSource
+  data         Json?
+  aiComment    String?
+
+  occurredAt   DateTime    @default(now())
+  createdAt    DateTime    @default(now())
+
+  @@index([subscriberId])
+}
+
+enum EventType {
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELED
+  TRIAL_STARTED
+  TRIAL_ENDED
+  NOTE_ADDED
+  AI_INSIGHT
+}
+
+enum EventSource {
+  STRIPE
+  USER
+  SYSTEM
+}
+
+model Note {
+  id           String     @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  content      String
+  createdAt    DateTime   @default(now())
+
+  @@index([subscriberId])
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  color       String?
+
+  subscribers Subscriber[]
+
+  @@unique([userId, name])
+}
+
+model Action {
+  id           String       @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber   @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  type         ActionType
+  status       ActionStatus @default(PENDING)
+
+  suggestedAt  DateTime     @default(now())
+  dueAt        DateTime?
+  completedAt  DateTime?
+
+  @@index([subscriberId])
+}
+
+enum ActionType {
+  REACH_OUT
+  OFFER_DISCOUNT
+  UPDATE_CARD
+  CONVERT_TRIAL
+  CELEBRATE_ANNIVERSARY
+}
+
+enum ActionStatus {
+  PENDING
+  DONE
+  DISMISSED
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subscriberId String?
+
+  type         AlertType
+  message      String
+  seen         Boolean   @default(false)
+
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+}
+
+enum AlertType {
+  PAYMENT_FAILED
+  TRIAL_ENDING
+  ANNIVERSARY
+  CHURN_RISK
+  CARD_EXPIRING
+  MILESTONE
+}
