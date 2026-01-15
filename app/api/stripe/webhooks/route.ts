@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe/client';
+
+export const dynamic = 'force-dynamic';
+
 import {
   handleCustomerCreated,
   handleCustomerUpdated,
