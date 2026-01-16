@@ -1539,3 +1539,502 @@ export const mockCampaigns: MockCampaign[] = [
 export function getCampaignById(id: string): MockCampaign | undefined {
   return mockCampaigns.find(c => c.id === id);
 }
+
+// ============================================
+// NEW: Warning Groups (Dashboard)
+// ============================================
+
+export interface WarningGroup {
+  id: string;
+  type: 'payment_failed' | 'trial_ending' | 'inactive' | 'card_expiring' |
+        'anniversary' | 'low_health' | 'limit_approaching' | 'downgrade_risk';
+  severity: 'critical' | 'warning' | 'info' | 'positive';
+  title: string;
+  userCount: number;
+  mrrAtRisk?: number;
+  description: string;
+  suggestedAction: string;
+  automationId?: string;
+  userIds: string[];
+}
+
+export const warningGroups: WarningGroup[] = [
+  {
+    id: 'wg_1',
+    type: 'payment_failed',
+    severity: 'critical',
+    title: 'Paiements echoues',
+    userCount: 2,
+    mrrAtRisk: 198,
+    description: '2 users avec paiement echoue depuis +3 jours',
+    suggestedAction: 'Relancer immediatement',
+    automationId: 'auto_4',
+    userIds: ['usr_11', 'usr_14'],
+  },
+  {
+    id: 'wg_2',
+    type: 'trial_ending',
+    severity: 'warning',
+    title: 'Trials expirent',
+    userCount: 3,
+    description: '3 trials expirent dans moins de 5 jours',
+    suggestedAction: 'Contacter pour conversion',
+    automationId: 'auto_3',
+    userIds: ['usr_7', 'usr_8', 'usr_9'],
+  },
+  {
+    id: 'wg_3',
+    type: 'inactive',
+    severity: 'warning',
+    title: 'Inactifs > 14j',
+    userCount: 4,
+    mrrAtRisk: 247,
+    description: '4 users payants non connectes depuis 14+ jours',
+    suggestedAction: 'Lancer campagne reengagement',
+    automationId: 'auto_6',
+    userIds: ['usr_12', 'usr_13', 'usr_14', 'usr_15'],
+  },
+  {
+    id: 'wg_4',
+    type: 'card_expiring',
+    severity: 'info',
+    title: 'CB expirent bientot',
+    userCount: 3,
+    mrrAtRisk: 178,
+    description: '3 cartes bancaires expirent dans < 30 jours',
+    suggestedAction: 'Envoyer rappel mise a jour',
+    userIds: ['usr_10', 'usr_11', 'usr_16'],
+  },
+  {
+    id: 'wg_5',
+    type: 'anniversary',
+    severity: 'positive',
+    title: 'Anniversaires',
+    userCount: 2,
+    description: '2 users fetent 1 an d\'abonnement ce mois',
+    suggestedAction: 'Envoyer felicitations',
+    userIds: ['usr_10', 'usr_16'],
+  },
+  {
+    id: 'wg_6',
+    type: 'low_health',
+    severity: 'warning',
+    title: 'Health score < 40',
+    userCount: 3,
+    mrrAtRisk: 296,
+    description: '3 users avec score de sante critique',
+    suggestedAction: 'Analyser et contacter',
+    userIds: ['usr_11', 'usr_12', 'usr_14'],
+  },
+  {
+    id: 'wg_7',
+    type: 'limit_approaching',
+    severity: 'info',
+    title: 'Limite atteinte',
+    userCount: 2,
+    description: '2 users ont atteint 90%+ de leur limite',
+    suggestedAction: 'Proposer upgrade',
+    automationId: 'auto_7',
+    userIds: ['usr_1', 'usr_5'],
+  },
+  {
+    id: 'wg_8',
+    type: 'downgrade_risk',
+    severity: 'warning',
+    title: 'Risque downgrade',
+    userCount: 1,
+    mrrAtRisk: 149,
+    description: '1 user Team sous-utilise son plan',
+    suggestedAction: 'Proposer formation features',
+    userIds: ['usr_16'],
+  },
+];
+
+export function getWarningsBySeverity(severity?: WarningGroup['severity']): WarningGroup[] {
+  if (!severity) return warningGroups;
+  return warningGroups.filter(w => w.severity === severity);
+}
+
+export function getCriticalWarningsCount(): number {
+  return warningGroups.filter(w => w.severity === 'critical').length;
+}
+
+export function getTotalMrrAtRisk(): number {
+  return warningGroups.reduce((sum, w) => sum + (w.mrrAtRisk || 0), 0);
+}
+
+// ============================================
+// NEW: Promo Codes
+// ============================================
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  discountType: 'percentage' | 'fixed' | 'free_months';
+  discountValue: number;
+  applicablePlans: string[] | 'all';
+  duration: 'first_payment' | 'months' | 'lifetime';
+  durationMonths?: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxUses?: number;
+  currentUses: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export const promoCodes: PromoCode[] = [
+  {
+    id: 'promo_1',
+    code: 'WELCOME20',
+    discountType: 'percentage',
+    discountValue: 20,
+    applicablePlans: 'all',
+    duration: 'months',
+    durationMonths: 3,
+    currentUses: 156,
+    isActive: true,
+    createdAt: daysAgo(365),
+  },
+  {
+    id: 'promo_2',
+    code: 'BLACKFRIDAY',
+    discountType: 'percentage',
+    discountValue: 30,
+    applicablePlans: 'all',
+    duration: 'first_payment',
+    validFrom: '2024-11-24',
+    validUntil: '2024-11-29',
+    maxUses: 200,
+    currentUses: 89,
+    isActive: true,
+    createdAt: daysAgo(60),
+  },
+  {
+    id: 'promo_3',
+    code: 'FRIEND25',
+    discountType: 'percentage',
+    discountValue: 25,
+    applicablePlans: 'all',
+    duration: 'months',
+    durationMonths: 1,
+    currentUses: 45,
+    isActive: true,
+    createdAt: daysAgo(180),
+  },
+  {
+    id: 'promo_4',
+    code: 'LAUNCH50',
+    discountType: 'percentage',
+    discountValue: 50,
+    applicablePlans: 'all',
+    duration: 'months',
+    durationMonths: 3,
+    validFrom: '2025-01-01',
+    validUntil: '2025-01-15',
+    maxUses: 500,
+    currentUses: 234,
+    isActive: false,
+    createdAt: daysAgo(30),
+  },
+];
+
+export function getActivePromoCodes(): PromoCode[] {
+  return promoCodes.filter(p => p.isActive);
+}
+
+// ============================================
+// NEW: Marketing Operations
+// ============================================
+
+export interface MarketingOperation {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  promoCodeId: string;
+  promoCode: string;
+  targetSegmentId: string;
+  targetSegmentName: string;
+  emails: {
+    launch: boolean;
+    reminder: boolean;
+    lastChance: boolean;
+  };
+  goals?: {
+    conversions: number;
+    mrr: number;
+  };
+  results: {
+    conversions: number;
+    mrrGenerated: number;
+    roi: number;
+    retentionM3: number;
+  };
+  status: 'draft' | 'scheduled' | 'active' | 'completed';
+}
+
+export const marketingOperations: MarketingOperation[] = [
+  {
+    id: 'op_1',
+    name: 'Black Friday 2024',
+    startDate: '2024-11-24',
+    endDate: '2024-11-29',
+    promoCodeId: 'promo_2',
+    promoCode: 'BLACKFRIDAY',
+    targetSegmentId: 'seg_2',
+    targetSegmentName: 'Freemium actifs',
+    emails: { launch: true, reminder: true, lastChance: true },
+    goals: { conversions: 50, mrr: 2000 },
+    results: { conversions: 89, mrrGenerated: 2400, roi: 340, retentionM3: 62 },
+    status: 'completed',
+  },
+  {
+    id: 'op_2',
+    name: 'Lancement V2',
+    startDate: '2025-01-01',
+    endDate: '2025-01-15',
+    promoCodeId: 'promo_4',
+    promoCode: 'LAUNCH50',
+    targetSegmentId: 'seg_1',
+    targetSegmentName: 'Tous les users',
+    emails: { launch: true, reminder: true, lastChance: true },
+    goals: { conversions: 100, mrr: 3000 },
+    results: { conversions: 234, mrrGenerated: 5800, roi: 280, retentionM3: 45 },
+    status: 'completed',
+  },
+  {
+    id: 'op_3',
+    name: 'Summer Sale 2025',
+    startDate: '2025-07-01',
+    endDate: '2025-07-15',
+    promoCodeId: 'promo_1',
+    promoCode: 'WELCOME20',
+    targetSegmentId: 'seg_2',
+    targetSegmentName: 'Freemium actifs',
+    emails: { launch: true, reminder: false, lastChance: true },
+    goals: { conversions: 30, mrr: 1500 },
+    results: { conversions: 0, mrrGenerated: 0, roi: 0, retentionM3: 0 },
+    status: 'scheduled',
+  },
+];
+
+export function getMarketingOperationById(id: string): MarketingOperation | undefined {
+  return marketingOperations.find(o => o.id === id);
+}
+
+// ============================================
+// NEW: Cohorts by Type
+// ============================================
+
+export interface CohortSegment {
+  id: string;
+  label: string;
+  userCount: number;
+  retention: number[];
+  avgMrr: number;
+  avgLtv: number;
+  churnRate: number;
+}
+
+export interface CohortGroup {
+  id: string;
+  name: string;
+  type: 'acquisition_month' | 'price' | 'promo' | 'tenure' | 'custom';
+  filterRules?: Array<{field: string; operator: string; value: string}>;
+  segments: CohortSegment[];
+}
+
+// Cohorts by price tier
+export const cohortsByPrice: CohortGroup = {
+  id: 'cg_price',
+  name: 'Par prix',
+  type: 'price',
+  segments: [
+    {
+      id: 'price_0_29',
+      label: '0-29€',
+      userCount: 8,
+      retention: [100, 75, 60, 52, 45, 40, 35, 32, 28, 25, 22, 20],
+      avgMrr: 15,
+      avgLtv: 89,
+      churnRate: 12,
+    },
+    {
+      id: 'price_30_99',
+      label: '30-99€',
+      userCount: 6,
+      retention: [100, 85, 75, 70, 65, 62, 58, 55, 52, 50, 48, 46],
+      avgMrr: 58,
+      avgLtv: 420,
+      churnRate: 6,
+    },
+    {
+      id: 'price_100_plus',
+      label: '100€+',
+      userCount: 4,
+      retention: [100, 92, 88, 85, 82, 80, 78, 76, 74, 72, 70, 68],
+      avgMrr: 149,
+      avgLtv: 1250,
+      churnRate: 3,
+    },
+  ],
+};
+
+// Cohorts by promo code used
+export const cohortsByPromo: CohortGroup = {
+  id: 'cg_promo',
+  name: 'Par promotion',
+  type: 'promo',
+  segments: [
+    {
+      id: 'promo_none',
+      label: 'Sans promo',
+      userCount: 10,
+      retention: [100, 88, 80, 75, 70, 68, 65, 62, 60, 58, 56, 54],
+      avgMrr: 67,
+      avgLtv: 580,
+      churnRate: 5,
+    },
+    {
+      id: 'promo_launch50',
+      label: 'LAUNCH50',
+      userCount: 5,
+      retention: [100, 72, 58, 45, 38, 32, 28, 25, 22, 20, 18, 16],
+      avgMrr: 29,
+      avgLtv: 145,
+      churnRate: 18,
+    },
+    {
+      id: 'promo_blackfriday',
+      label: 'BLACKFRIDAY',
+      userCount: 3,
+      retention: [100, 80, 70, 62, 55, 50, 46, 42, 38, 35, 32, 30],
+      avgMrr: 45,
+      avgLtv: 290,
+      churnRate: 9,
+    },
+    {
+      id: 'promo_friend25',
+      label: 'FRIEND25',
+      userCount: 2,
+      retention: [100, 90, 85, 82, 78, 75, 72, 70, 68, 66, 64, 62],
+      avgMrr: 72,
+      avgLtv: 620,
+      churnRate: 4,
+    },
+  ],
+};
+
+// Cohorts by tenure
+export const cohortsByTenure: CohortGroup = {
+  id: 'cg_tenure',
+  name: 'Par anciennete',
+  type: 'tenure',
+  segments: [
+    {
+      id: 'tenure_0_3',
+      label: '< 3 mois',
+      userCount: 6,
+      retention: [100, 72, 58, 50],
+      avgMrr: 42,
+      avgLtv: 89,
+      churnRate: 8.2,
+    },
+    {
+      id: 'tenure_3_6',
+      label: '3-6 mois',
+      userCount: 4,
+      retention: [100, 85, 78, 72, 68, 65],
+      avgMrr: 58,
+      avgLtv: 245,
+      churnRate: 4.5,
+    },
+    {
+      id: 'tenure_6_12',
+      label: '6-12 mois',
+      userCount: 5,
+      retention: [100, 90, 85, 82, 80, 78, 75, 73, 71, 70, 68, 66],
+      avgMrr: 89,
+      avgLtv: 520,
+      churnRate: 2.8,
+    },
+    {
+      id: 'tenure_12_plus',
+      label: '> 12 mois',
+      userCount: 3,
+      retention: [100, 95, 92, 90, 88, 86, 85, 84, 83, 82, 81, 80],
+      avgMrr: 125,
+      avgLtv: 890,
+      churnRate: 1.2,
+    },
+  ],
+};
+
+// Custom cohorts
+export const customCohorts: CohortGroup[] = [
+  {
+    id: 'cg_custom_1',
+    name: 'ProductHunt Users',
+    type: 'custom',
+    filterRules: [{ field: 'source', operator: 'equals', value: 'producthunt' }],
+    segments: [
+      {
+        id: 'custom_ph',
+        label: 'ProductHunt',
+        userCount: 45,
+        retention: [100, 68, 52, 42, 35, 30, 26, 23, 20, 18, 16, 14],
+        avgMrr: 32,
+        avgLtv: 120,
+        churnRate: 15,
+      },
+    ],
+  },
+  {
+    id: 'cg_custom_2',
+    name: 'Referral Users',
+    type: 'custom',
+    filterRules: [{ field: 'source', operator: 'equals', value: 'referral' }],
+    segments: [
+      {
+        id: 'custom_ref',
+        label: 'Parrainage',
+        userCount: 28,
+        retention: [100, 92, 88, 85, 82, 80, 78, 76, 74, 72, 70, 68],
+        avgMrr: 78,
+        avgLtv: 680,
+        churnRate: 3,
+      },
+    ],
+  },
+];
+
+export function getCohortsByType(type: CohortGroup['type']): CohortGroup | CohortGroup[] | null {
+  switch (type) {
+    case 'acquisition_month':
+      return {
+        id: 'cg_month',
+        name: 'Par mois d\'acquisition',
+        type: 'acquisition_month',
+        segments: mockCohorts.map(c => ({
+          id: c.id,
+          label: c.period,
+          userCount: c.usersCount,
+          retention: c.retention,
+          avgMrr: c.avgMrr,
+          avgLtv: c.avgLtv,
+          churnRate: c.churnRate,
+        })),
+      };
+    case 'price':
+      return cohortsByPrice;
+    case 'promo':
+      return cohortsByPromo;
+    case 'tenure':
+      return cohortsByTenure;
+    case 'custom':
+      return customCohorts;
+    default:
+      return null;
+  }
+}

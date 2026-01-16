@@ -1,145 +1,154 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { getStats, mockAlerts, mrrHistory, formatCurrency, getUserById } from '@/lib/mock-data';
-import { StatCard } from '@/components/ui/stat-card';
+import { getStats, mrrHistory, formatCurrency, warningGroups, getTotalMrrAtRisk } from '@/lib/mock-data';
 import { Card } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/badge';
-import { CoachInline } from '@/components/coach';
+import { CoachChips } from '@/components/coach';
+import { PeriodSelector, WarningsGrid, Period } from '@/components/dashboard';
+
+// KPI card with coach chips
+interface KpiCardProps {
+  label: string;
+  value: string | number;
+  change: number;
+  coachQuestions: Array<{ text: string; mockAnswer: string }>;
+}
+
+function KpiCard({ label, value, change, coachQuestions }: KpiCardProps) {
+  const isPositive = change >= 0;
+  const isNegativeGood = label.toLowerCase().includes('churn');
+  const displayPositive = isNegativeGood ? !isPositive : isPositive;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <p className="text-sm text-gray-500">{label}</p>
+      <div className="flex items-baseline gap-2 mt-1">
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <span
+          className={`text-sm font-medium ${
+            displayPositive ? 'text-green-600' : 'text-red-600'
+          }`}
+        >
+          {isPositive ? '+' : ''}{change}%
+          {displayPositive ? ' ▲' : ' ▼'}
+        </span>
+      </div>
+      <div className="mt-3">
+        <CoachChips questions={coachQuestions} className="gap-1" />
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
+  const [period, setPeriod] = useState<Period>('30d');
   const stats = getStats();
+  const totalMrrAtRisk = getTotalMrrAtRisk();
 
-  // Get urgent alerts for the todo list
-  const urgentAlerts = mockAlerts
-    .filter((a) => !a.seen && (a.severity === 'critical' || a.severity === 'warning'))
-    .slice(0, 6);
-
-  // Get AI insights
-  const insights = [
+  // Coach questions for each KPI
+  const mrrQuestions = [
     {
-      message: `${stats.freemiumCount} users freemium sont très actifs cette semaine. C'est le bon moment pour leur proposer un trial.`,
-      type: 'opportunity',
+      text: 'Pourquoi +12% ?',
+      mockAnswer: `Votre MRR a augmente de 12% ce mois grace a :\n\n**Contributions positives :**\n- 3 nouveaux clients payants (+350€)\n- 2 upgrades Starter → Growth (+116€)\n- 1 reactivation churn (+49€)\n\n**Pertes :**\n- 1 churn (Julien Blanc, -149€)\n- 2 paiements echoues en attente\n\n**Net :** +366€ MRR ce mois`,
     },
     {
-      message: `Le churn a augmenté de 15% ce mois. Les paiements échoués en sont la cause principale.`,
-      type: 'warning',
-    },
-    {
-      message: `${stats.trialCount} users en trial, dont 1 expire dans 2 jours avec un engagement élevé.`,
-      type: 'info',
+      text: 'Prevision M+1 ?',
+      mockAnswer: `**Projection MRR pour le mois prochain :**\n\n📈 **Scenario optimiste :** 1 450€ (+17%)\n- Si les 3 trials convertissent\n- Si les paiements echoues sont recuperes\n\n📊 **Scenario realiste :** 1 320€ (+6%)\n- Conversion 2/3 trials\n- Recuperation 1 paiement\n\n📉 **Scenario pessimiste :** 1 180€ (-5%)\n- Aucune conversion trial\n- Perte des 2 paiements echoues`,
     },
   ];
 
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return '🔴';
-      case 'warning':
-        return '🟡';
-      default:
-        return '🟢';
-    }
-  };
+  const usersQuestions = [
+    {
+      text: 'Qui sont-ils ?',
+      mockAnswer: `**Repartition des ${stats.activeUsersCount} users actifs :**\n\n**Par plan :**\n- Starter : 4 users (49€/mois)\n- Growth : 2 users (99€/mois)\n- Team : 1 user (149€/mois)\n\n**Par anciennete :**\n- < 3 mois : 3 users\n- 3-12 mois : 3 users\n- > 12 mois : 1 user\n\n**Top users par MRR :**\n1. Startup Co (149€)\n2. Tech Sarl (99€)\n3. Agence Martin (99€)`,
+    },
+    {
+      text: 'Tendance ?',
+      mockAnswer: `**Tendance users actifs :**\n\n📈 **+8% ce mois** (vs -2% le mois dernier)\n\n**Evolution sur 6 mois :**\n- Jan : 5 users\n- Fev : 5 users\n- Mar : 6 users\n- Avr : 6 users\n- Mai : 7 users ← aujourd'hui\n\n**Projection :** 8-9 users fin du trimestre si tendance maintenue`,
+    },
+  ];
+
+  const churnQuestions = [
+    {
+      text: 'Pourquoi ?',
+      mockAnswer: `**Analyse du churn (${stats.churnRate}%) :**\n\n**Causes principales :**\n1. **Paiements echoues** (40%) — 2 users\n2. **Inactivite** (35%) — Pas de connexion 30j+\n3. **Prix** (15%) — Feedbacks "trop cher"\n4. **Fonctionnalites** (10%) — Manque feature cle\n\n**Cohorte la plus touchee :**\nUsers acquis avec promo LAUNCH50 (churn 18% vs 5% moyenne)`,
+    },
+    {
+      text: 'Qui est a risque ?',
+      mockAnswer: `**Users a risque de churn :**\n\n🔴 **Critique (churn imminent) :**\n1. marie@startup.fr — 3 paiements echoues\n2. julien.blanc@corp.io — Inactif 30 jours\n\n🟡 **A surveiller :**\n3. pierre.leroy@free.fr — Health score 45\n4. paul.moreau@acme.io — Trial expire J+2\n\n**MRR a risque total :** ${totalMrrAtRisk}€`,
+    },
+  ];
+
+  const conversionQuestions = [
+    {
+      text: 'Comment ameliorer ?',
+      mockAnswer: `**Ameliorer la conversion trial→paid (${stats.trialConversionRate}%) :**\n\n**Quick wins :**\n1. Email J+3 avec cas d'usage → +15% conversion\n2. Onboarding guide in-app → +20% engagement\n3. Call decouverte pour trials > 50€ → +35% conversion\n\n**Votre conversion vs marche :**\n- Votre taux : ${stats.trialConversionRate}%\n- Moyenne SaaS B2B : 15-25%\n- Top performers : 30-40%`,
+    },
+    {
+      text: 'Quels trials ?',
+      mockAnswer: `**Trials en cours (${stats.trialCount}) :**\n\n**Proches de convertir :**\n1. paul.moreau@acme.io\n   - Expire dans 2 jours\n   - Health score : 85 (excellent)\n   - Utilise 4/5 features cles\n\n**A relancer :**\n2. lea.martinez@company.com\n   - Expire dans 5 jours\n   - Health score : 60 (moyen)\n   - N'a pas configure les integrations\n\n**A risque :**\n3. startup@test.io\n   - Expire dans 3 jours\n   - Health score : 35 (faible)\n   - Derniere connexion il y a 8 jours`,
+    },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Bonjour 👋</h1>
-        <p className="text-gray-500 mt-1">
-          Voici ce qui se passe avec tes users aujourd&apos;hui
-        </p>
+    <div className="max-w-6xl mx-auto">
+      {/* Header with period selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-1">Vue d&apos;ensemble de ton activite</p>
+        </div>
+        <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
+      {/* KPI Cards with Coach Chips */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard
           label="MRR"
           value={formatCurrency(stats.mrr)}
           change={stats.mrrGrowth}
+          coachQuestions={mrrQuestions}
         />
-        <StatCard
+        <KpiCard
           label="Users actifs"
           value={stats.activeUsersCount}
           change={stats.activeUsersGrowth}
+          coachQuestions={usersQuestions}
         />
-        <StatCard
+        <KpiCard
           label="Churn rate"
           value={`${stats.churnRate}%`}
-          change={-2.1}
+          change={0.5}
+          coachQuestions={churnQuestions}
         />
-        <StatCard
+        <KpiCard
           label="Trial → Paid"
           value={`${stats.trialConversionRate}%`}
-          change={5}
+          change={-2}
+          coachQuestions={conversionQuestions}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Todo List */}
-        <div className="lg:col-span-2">
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">À faire aujourd&apos;hui</h2>
-              <span className="text-sm text-gray-500">{urgentAlerts.length} actions</span>
-            </div>
-            <div className="space-y-3">
-              {urgentAlerts.map((alert) => {
-                const user = getUserById(alert.userId);
-                return (
-                  <Link
-                    key={alert.id}
-                    href={`/users/${alert.userId}`}
-                    className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-lg">{getSeverityIcon(alert.severity)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 line-clamp-2">{alert.message.split('—')[0]}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {user?.email}
-                      </p>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                );
-              })}
-            </div>
-            <Link
-              href="/alerts"
-              className="mt-4 block text-center text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              Voir toutes les alertes →
-            </Link>
-          </Card>
-        </div>
-
-        {/* Coach IA Inline */}
-        <div>
-          <CoachInline context="dashboard" />
-
-          {/* Insights */}
-          <Card className="mt-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Insights du jour</h3>
-            <div className="space-y-3">
-              {insights.map((insight, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <span className="text-sm mt-0.5">
-                    {insight.type === 'opportunity' ? '💡' : insight.type === 'warning' ? '⚠️' : 'ℹ️'}
-                  </span>
-                  <p className="text-sm text-gray-700">{insight.message}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+      {/* Warnings Grid */}
+      <div className="mb-8">
+        <WarningsGrid warnings={warningGroups} />
       </div>
 
       {/* MRR Chart */}
       <Card className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Évolution MRR</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Evolution MRR</h2>
+          <CoachChips
+            questions={[
+              {
+                text: 'Comment accelerer ?',
+                mockAnswer: `**Strategies pour accelerer la croissance MRR :**\n\n**Court terme (ce mois) :**\n1. Convertir les 3 trials actifs → +180€ potentiel\n2. Recuperer les paiements echoues → +198€\n3. Upgrade Pierre (limite atteinte) → +50€\n\n**Moyen terme (3 mois) :**\n1. Augmenter les prix de 10-15%\n2. Ajouter un plan "Scale" premium\n3. Programme de parrainage (LTV 40% superieur)\n\n**Potentiel a 3 mois :** +40-60% MRR`,
+              },
+            ]}
+          />
+        </div>
         <div className="h-48 flex items-end gap-2">
           {mrrHistory.map((data, i) => {
             const maxMrr = Math.max(...mrrHistory.map((d) => d.mrr));
@@ -162,7 +171,7 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* Quick Stats */}
+      {/* Quick Stats by Status */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
         <Link href="/users?status=freemium" className="bg-white rounded-xl p-4 border border-gray-200 text-center hover:border-gray-300 transition-colors">
           <StatusDot status="freemium" />
@@ -182,16 +191,16 @@ export default function DashboardPage() {
         <Link href="/users?status=at_risk" className="bg-white rounded-xl p-4 border border-gray-200 text-center hover:border-gray-300 transition-colors">
           <StatusDot status="at_risk" />
           <p className="text-2xl font-bold text-gray-900 mt-2">{stats.atRiskCount}</p>
-          <p className="text-xs text-gray-500">À risque</p>
+          <p className="text-xs text-gray-500">A risque</p>
         </Link>
         <Link href="/users?status=churned" className="bg-white rounded-xl p-4 border border-gray-200 text-center hover:border-gray-300 transition-colors">
           <StatusDot status="churned" />
           <p className="text-2xl font-bold text-gray-900 mt-2">{stats.churnedCount}</p>
-          <p className="text-xs text-gray-500">Churnés</p>
+          <p className="text-xs text-gray-500">Churnes</p>
         </Link>
       </div>
 
-      {/* View All */}
+      {/* View All Users */}
       <Link
         href="/users"
         className="block w-full text-center py-3 bg-white border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"

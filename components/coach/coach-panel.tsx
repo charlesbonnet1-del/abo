@@ -9,7 +9,15 @@ interface Message {
   timestamp: Date;
 }
 
-interface CoachPanelProps {
+// New props for chip-triggered panel
+interface ChipPanelProps {
+  question: string;
+  answer: string;
+  onClose: () => void;
+}
+
+// Legacy props for button-triggered panel
+interface LegacyPanelProps {
   isOpen: boolean;
   onClose: () => void;
   contextUser?: {
@@ -19,8 +27,14 @@ interface CoachPanelProps {
   } | null;
 }
 
+type CoachPanelProps = ChipPanelProps | LegacyPanelProps;
+
+function isChipPanel(props: CoachPanelProps): props is ChipPanelProps {
+  return 'question' in props && 'answer' in props;
+}
+
 // Pre-defined coach responses based on keywords
-const getCoachResponse = (message: string, contextUser?: CoachPanelProps['contextUser']): string => {
+const getCoachResponse = (message: string, contextUser?: LegacyPanelProps['contextUser']): string => {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes('churn') || lowerMessage.includes('attrition')) {
@@ -50,7 +64,173 @@ const getCoachResponse = (message: string, contextUser?: CoachPanelProps['contex
   return `Je peux t'aider avec :\n\n• 📉 **Réduire le churn** - Identifier et retenir les users à risque\n• 📈 **Améliorer les conversions** - Optimiser trial → paid\n• ✉️ **Générer des emails** - Relance, onboarding, upgrade\n• 🎯 **Analyser un user** - Comprendre son comportement\n\nPose-moi ta question !`;
 };
 
-export function CoachPanel({ isOpen, onClose, contextUser }: CoachPanelProps) {
+export function CoachPanel(props: CoachPanelProps) {
+  // Handle chip-triggered panel
+  if (isChipPanel(props)) {
+    return <ChipTriggeredPanel {...props} />;
+  }
+
+  // Handle legacy button-triggered panel
+  return <LegacyTriggeredPanel {...props} />;
+}
+
+function ChipTriggeredPanel({ question, answer, onClose }: ChipPanelProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    { id: '1', role: 'user', content: question, timestamp: new Date() },
+    { id: '2', role: 'assistant', content: answer, timestamp: new Date() },
+  ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setIsVisible(true));
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(onClose, 200);
+  };
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
+    setIsTyping(true);
+
+    setTimeout(() => {
+      const response = getCoachResponse(input);
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: 'assistant', content: response, timestamp: new Date() },
+      ]);
+      setIsTyping(false);
+    }, 800 + Math.random() * 500);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/20 z-40 transition-opacity duration-200 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={handleClose}
+      />
+
+      {/* Panel */}
+      <div
+        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50
+                    flex flex-col transition-transform duration-200 ease-out ${
+                      isVisible ? 'translate-x-0' : 'translate-x-full'
+                    }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-violet-600 to-purple-600 text-white">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">✨</span>
+            <h2 className="font-semibold">Coach Abo</h2>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+              {msg.role === 'assistant' && (
+                <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">✨</span>
+                </div>
+              )}
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                  msg.role === 'user'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              </div>
+              {msg.role === 'user' && (
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">👤</span>
+                </div>
+              )}
+            </div>
+          ))}
+          {isTyping && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm">✨</span>
+              </div>
+              <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Pose une question..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-full
+                         focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent
+                         text-sm"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isTyping}
+              className="p-2 bg-violet-600 text-white rounded-full hover:bg-violet-700
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LegacyTriggeredPanel({ isOpen, onClose, contextUser }: LegacyPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
