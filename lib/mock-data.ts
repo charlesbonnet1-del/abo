@@ -2124,3 +2124,268 @@ export function getCohortsByType(type: CohortGroup['type']): CohortGroup | Cohor
       return null;
   }
 }
+
+// ============================================
+// KPI Detail Data
+// ============================================
+
+export interface KpiDataPoint {
+  month: string;
+  value: number;
+}
+
+export interface PlanBreakdown {
+  plan: string;
+  value: number;
+  percentTotal: number;
+  evolution: number;
+  userCount: number;
+}
+
+export interface MrrMovement {
+  type: 'new' | 'expansion' | 'contraction' | 'churn';
+  label: string;
+  amount: number;
+  count: number;
+}
+
+export interface ChurnReason {
+  reason: string;
+  userCount: number;
+  percent: number;
+}
+
+export interface ActivityBreakdown {
+  label: string;
+  count: number;
+  percent: number;
+  isWarning?: boolean;
+}
+
+export interface FunnelStep {
+  label: string;
+  count: number;
+  percent: number;
+}
+
+export interface SourceConversion {
+  source: string;
+  trials: number;
+  converted: number;
+  rate: number;
+  isWarning?: boolean;
+}
+
+// MRR KPI Data
+export const mrrKpiHistory: KpiDataPoint[] = [
+  { month: 'Jan', value: 8000 },
+  { month: 'Fev', value: 8200 },
+  { month: 'Mar', value: 8600 },
+  { month: 'Avr', value: 9100 },
+  { month: 'Mai', value: 9800 },
+  { month: 'Jun', value: 10200 },
+  { month: 'Jul', value: 10800 },
+  { month: 'Aou', value: 11200 },
+  { month: 'Sep', value: 11600 },
+  { month: 'Oct', value: 11900 },
+  { month: 'Nov', value: 12100 },
+  { month: 'Dec', value: 12400 },
+];
+
+export const mrrByPlan: PlanBreakdown[] = [
+  { plan: 'Scale', value: 4200, percentTotal: 34, evolution: 18, userCount: 12 },
+  { plan: 'Team', value: 3800, percentTotal: 31, evolution: 12, userCount: 24 },
+  { plan: 'Growth', value: 2900, percentTotal: 23, evolution: 8, userCount: 45 },
+  { plan: 'Starter', value: 1500, percentTotal: 12, evolution: 5, userCount: 89 },
+];
+
+export const mrrMovements: MrrMovement[] = [
+  { type: 'new', label: 'New MRR', amount: 1800, count: 23 },
+  { type: 'expansion', label: 'Expansion', amount: 450, count: 8 },
+  { type: 'contraction', label: 'Contraction', amount: -180, count: 3 },
+  { type: 'churn', label: 'Churn', amount: -520, count: 6 },
+];
+
+// Churn KPI Data
+export const churnHistory: KpiDataPoint[] = [
+  { month: 'Jan', value: 6.0 },
+  { month: 'Fev', value: 5.5 },
+  { month: 'Mar', value: 4.8 },
+  { month: 'Avr', value: 4.5 },
+  { month: 'Mai', value: 4.3 },
+  { month: 'Jun', value: 4.1 },
+  { month: 'Jul', value: 4.0 },
+  { month: 'Aou', value: 3.9 },
+  { month: 'Sep', value: 4.0 },
+  { month: 'Oct', value: 4.5 },
+  { month: 'Nov', value: 5.0 },
+  { month: 'Dec', value: 4.2 },
+];
+
+export const churnByPlan: Array<{ plan: string; churnRate: number; vsLastMonth: number; usersLost: number; mrrLost: number }> = [
+  { plan: 'Starter', churnRate: 8.2, vsLastMonth: 1.2, usersLost: 12, mrrLost: 290 },
+  { plan: 'Growth', churnRate: 4.5, vsLastMonth: 0.3, usersLost: 3, mrrLost: 180 },
+  { plan: 'Team', churnRate: 2.1, vsLastMonth: -0.2, usersLost: 1, mrrLost: 50 },
+  { plan: 'Scale', churnRate: 0.8, vsLastMonth: 0, usersLost: 0, mrrLost: 0 },
+];
+
+export const churnReasons: ChurnReason[] = [
+  { reason: 'Paiement echoue non resolu', userCount: 6, percent: 38 },
+  { reason: 'Annulation volontaire', userCount: 5, percent: 31 },
+  { reason: 'Inactivite prolongee', userCount: 3, percent: 19 },
+  { reason: 'Downgrade vers Free', userCount: 2, percent: 12 },
+];
+
+// Users Actifs KPI Data
+export const usersHistory: KpiDataPoint[] = [
+  { month: 'Jan', value: 320 },
+  { month: 'Fev', value: 345 },
+  { month: 'Mar', value: 380 },
+  { month: 'Avr', value: 410 },
+  { month: 'Mai', value: 435 },
+  { month: 'Jun', value: 460 },
+  { month: 'Jul', value: 478 },
+  { month: 'Aou', value: 490 },
+  { month: 'Sep', value: 502 },
+  { month: 'Oct', value: 510 },
+  { month: 'Nov', value: 518 },
+  { month: 'Dec', value: 523 },
+];
+
+export const usersByStatus: Array<{ status: string; count: number; percentTotal: number; evolution: number }> = [
+  { status: 'Payants', count: 312, percentTotal: 60, evolution: 12 },
+  { status: 'Trial', count: 45, percentTotal: 9, evolution: 5 },
+  { status: 'Freemium', count: 166, percentTotal: 31, evolution: 8 },
+];
+
+export const activityBreakdown: ActivityBreakdown[] = [
+  { label: 'Actifs aujourd\'hui', count: 89, percent: 17 },
+  { label: 'Actifs cette semaine', count: 234, percent: 45 },
+  { label: 'Actifs ce mois', count: 412, percent: 79 },
+  { label: 'Inactifs > 30j', count: 111, percent: 21, isWarning: true },
+];
+
+// Trial Conversion KPI Data
+export const conversionHistory: KpiDataPoint[] = [
+  { month: 'Jan', value: 20 },
+  { month: 'Fev', value: 25 },
+  { month: 'Mar', value: 32 },
+  { month: 'Avr', value: 28 },
+  { month: 'Mai', value: 26 },
+  { month: 'Jun', value: 24 },
+  { month: 'Jul', value: 22 },
+  { month: 'Aou', value: 21 },
+  { month: 'Sep', value: 20 },
+  { month: 'Oct', value: 21 },
+  { month: 'Nov', value: 22 },
+  { month: 'Dec', value: 23 },
+];
+
+export const conversionFunnel: FunnelStep[] = [
+  { label: 'Trial demarres', count: 120, percent: 100 },
+  { label: 'Actifs en trial', count: 89, percent: 74 },
+  { label: 'Ont vu pricing', count: 65, percent: 54 },
+  { label: 'Ont clique upgrade', count: 42, percent: 35 },
+  { label: 'Convertis', count: 28, percent: 23 },
+];
+
+export const conversionBySource: SourceConversion[] = [
+  { source: 'Organic', trials: 45, converted: 14, rate: 31 },
+  { source: 'ProductHunt', trials: 32, converted: 8, rate: 25 },
+  { source: 'Referral', trials: 23, converted: 5, rate: 22 },
+  { source: 'Paid Ads', trials: 20, converted: 1, rate: 5, isWarning: true },
+];
+
+// ============================================
+// User Attributes
+// ============================================
+
+export type AttributeType = 'text' | 'number' | 'date' | 'select' | 'boolean';
+export type AttributeSource = 'stripe' | 'system' | 'predefined' | 'custom';
+
+export interface UserAttribute {
+  id: string;
+  name: string;
+  key: string;
+  type: AttributeType;
+  source: AttributeSource;
+  isLocked: boolean;
+  isRequired: boolean;
+  isActive: boolean;
+  options?: string[];
+  defaultValue?: string | number | boolean;
+  usedInSegments: number;
+  usedInAutomations: number;
+}
+
+export const systemAttributes: UserAttribute[] = [
+  { id: 'attr_1', name: 'Email', key: 'email', type: 'text', source: 'stripe', isLocked: true, isRequired: true, isActive: true, usedInSegments: 3, usedInAutomations: 5 },
+  { id: 'attr_2', name: 'Plan', key: 'plan', type: 'select', source: 'stripe', isLocked: true, isRequired: true, isActive: true, options: ['free', 'starter', 'growth', 'team', 'scale'], usedInSegments: 8, usedInAutomations: 12 },
+  { id: 'attr_3', name: 'MRR', key: 'mrr', type: 'number', source: 'stripe', isLocked: true, isRequired: true, isActive: true, usedInSegments: 4, usedInAutomations: 2 },
+  { id: 'attr_4', name: 'Status', key: 'status', type: 'select', source: 'system', isLocked: true, isRequired: true, isActive: true, options: ['freemium', 'trial', 'active', 'at_risk', 'churned'], usedInSegments: 6, usedInAutomations: 8 },
+  { id: 'attr_5', name: 'Health Score', key: 'health_score', type: 'number', source: 'system', isLocked: true, isRequired: true, isActive: true, usedInSegments: 2, usedInAutomations: 3 },
+  { id: 'attr_6', name: 'Date inscription', key: 'created_at', type: 'date', source: 'stripe', isLocked: true, isRequired: true, isActive: true, usedInSegments: 2, usedInAutomations: 0 },
+  { id: 'attr_7', name: 'Derniere activite', key: 'last_seen_at', type: 'date', source: 'system', isLocked: true, isRequired: true, isActive: true, usedInSegments: 4, usedInAutomations: 2 },
+];
+
+export const predefinedAttributes: UserAttribute[] = [
+  { id: 'attr_8', name: 'Secteur d\'activite', key: 'industry', type: 'select', source: 'predefined', isLocked: false, isRequired: false, isActive: true, options: ['SaaS', 'E-commerce', 'Marketplace', 'Fintech', 'Media', 'Autre'], usedInSegments: 2, usedInAutomations: 1 },
+  { id: 'attr_9', name: 'Taille entreprise', key: 'company_size', type: 'select', source: 'predefined', isLocked: false, isRequired: false, isActive: true, options: ['1-10', '11-50', '51-200', '201-500', '500+'], usedInSegments: 1, usedInAutomations: 0 },
+  { id: 'attr_10', name: 'Source acquisition', key: 'acquisition_source', type: 'select', source: 'predefined', isLocked: false, isRequired: false, isActive: true, options: ['Organic', 'ProductHunt', 'Paid Ads', 'Referral', 'Social', 'Autre'], usedInSegments: 3, usedInAutomations: 0 },
+  { id: 'attr_11', name: 'Pays', key: 'country', type: 'select', source: 'predefined', isLocked: false, isRequired: false, isActive: true, options: ['France', 'USA', 'UK', 'Germany', 'Canada', 'Autre'], usedInSegments: 1, usedInAutomations: 0 },
+  { id: 'attr_12', name: 'Score NPS', key: 'nps_score', type: 'number', source: 'predefined', isLocked: false, isRequired: false, isActive: false, usedInSegments: 0, usedInAutomations: 0 },
+  { id: 'attr_13', name: 'Date premier contact', key: 'first_contact_date', type: 'date', source: 'predefined', isLocked: false, isRequired: false, isActive: false, usedInSegments: 0, usedInAutomations: 0 },
+];
+
+export const customAttributes: UserAttribute[] = [
+  { id: 'attr_14', name: 'Potentiel upsell', key: 'upsell_potential', type: 'select', source: 'custom', isLocked: false, isRequired: false, isActive: true, options: ['Faible', 'Moyen', 'Fort'], usedInSegments: 1, usedInAutomations: 0 },
+  { id: 'attr_15', name: 'Account manager', key: 'account_manager', type: 'text', source: 'custom', isLocked: false, isRequired: false, isActive: true, usedInSegments: 0, usedInAutomations: 0 },
+  { id: 'attr_16', name: 'Date demo', key: 'demo_date', type: 'date', source: 'custom', isLocked: false, isRequired: false, isActive: true, usedInSegments: 0, usedInAutomations: 0 },
+];
+
+export function getAllAttributes(): UserAttribute[] {
+  return [...systemAttributes, ...predefinedAttributes, ...customAttributes];
+}
+
+export function getActiveAttributes(): UserAttribute[] {
+  return getAllAttributes().filter(a => a.isActive);
+}
+
+export function getAttributesBySource(source: AttributeSource): UserAttribute[] {
+  return getAllAttributes().filter(a => a.source === source);
+}
+
+// Sample user attribute values
+export interface UserAttributeValues {
+  [key: string]: string | number | boolean | null;
+}
+
+export const sampleUserAttributes: Record<string, UserAttributeValues> = {
+  'usr_1': {
+    industry: 'SaaS',
+    company_size: '11-50',
+    acquisition_source: 'ProductHunt',
+    country: 'France',
+    upsell_potential: 'Fort',
+    account_manager: 'Thomas',
+    demo_date: '2025-01-12',
+  },
+  'usr_2': {
+    industry: 'E-commerce',
+    company_size: '1-10',
+    acquisition_source: 'Organic',
+    country: 'USA',
+    upsell_potential: 'Moyen',
+    account_manager: null,
+    demo_date: null,
+  },
+  'usr_3': {
+    industry: 'Fintech',
+    company_size: '51-200',
+    acquisition_source: 'Referral',
+    country: 'UK',
+    upsell_potential: 'Fort',
+    account_manager: 'Marie',
+    demo_date: '2024-12-20',
+  },
+};

@@ -6,6 +6,7 @@ import { mockUsers, type UserStatus, formatDate } from '@/lib/mock-data';
 import { StatusDot, PlanBadge } from '@/components/ui/badge';
 import { HealthBar } from '@/components/ui/health-bar';
 import { Avatar } from '@/components/ui/avatar';
+import { ExportButton, formatUsersForExport } from '@/components/export';
 
 type FilterValue = '' | UserStatus;
 
@@ -55,7 +56,7 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <div className="relative flex-1 sm:w-64">
             <input
               type="text"
@@ -78,6 +79,10 @@ export default function UsersPage() {
               />
             </svg>
           </div>
+          <ExportButton
+            data={formatUsersForExport(filteredUsers)}
+            filename={statusFilter ? `users_${statusFilter}` : 'users'}
+          />
         </div>
       </div>
 
