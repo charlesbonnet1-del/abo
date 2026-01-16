@@ -5,6 +5,7 @@ import { getStats, mockAlerts, mrrHistory, formatCurrency, getUserById } from '@
 import { StatCard } from '@/components/ui/stat-card';
 import { Card } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/badge';
+import { CoachInline } from '@/components/coach';
 
 export default function DashboardPage() {
   const stats = getStats();
@@ -115,23 +116,23 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Coach IA Preview */}
+        {/* Coach IA Inline */}
         <div>
-          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl">✨</span>
-              <h2 className="text-lg font-semibold text-indigo-900">Coach IA</h2>
-            </div>
+          <CoachInline context="dashboard" />
+
+          {/* Insights */}
+          <Card className="mt-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Insights du jour</h3>
             <div className="space-y-3">
-              {insights.slice(0, 2).map((insight, i) => (
-                <p key={i} className="text-sm text-indigo-800">
-                  {insight.message}
-                </p>
+              {insights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="text-sm mt-0.5">
+                    {insight.type === 'opportunity' ? '💡' : insight.type === 'warning' ? '⚠️' : 'ℹ️'}
+                  </span>
+                  <p className="text-sm text-gray-700">{insight.message}</p>
+                </div>
               ))}
             </div>
-            <p className="mt-4 text-xs text-indigo-600">
-              Clique sur le bouton ✨ en bas à droite pour parler au coach
-            </p>
           </Card>
         </div>
       </div>

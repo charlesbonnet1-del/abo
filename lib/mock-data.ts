@@ -863,3 +863,679 @@ export function formatDate(dateString: string): string {
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
 }
+
+// ============================================
+// NEW: Segments
+// ============================================
+
+export interface FilterRule {
+  field: 'status' | 'plan' | 'healthScore' | 'lastSeenDays' | 'mrr' | 'createdDays' | 'tag';
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'in';
+  value: string | number | string[];
+}
+
+export interface MockSegment {
+  id: string;
+  name: string;
+  description: string;
+  filterRules: FilterRule[];
+  userCount: number;
+  createdAt: string;
+  isSystem: boolean; // true = predefined, can't delete
+}
+
+export const mockSegments: MockSegment[] = [
+  {
+    id: 'seg_1',
+    name: 'Tous les users',
+    description: 'Tous les utilisateurs de la plateforme',
+    filterRules: [],
+    userCount: mockUsers.length,
+    createdAt: daysAgo(365),
+    isSystem: true,
+  },
+  {
+    id: 'seg_2',
+    name: 'Freemium actifs',
+    description: 'Users freemium connectés dans les 7 derniers jours',
+    filterRules: [
+      { field: 'status', operator: 'equals', value: 'freemium' },
+      { field: 'lastSeenDays', operator: 'less_than', value: 7 },
+    ],
+    userCount: 4,
+    createdAt: daysAgo(180),
+    isSystem: true,
+  },
+  {
+    id: 'seg_3',
+    name: 'Trials expiring soon',
+    description: 'Users en trial qui expire dans 3 jours ou moins',
+    filterRules: [
+      { field: 'status', operator: 'equals', value: 'trial' },
+    ],
+    userCount: 1,
+    createdAt: daysAgo(180),
+    isSystem: true,
+  },
+  {
+    id: 'seg_4',
+    name: 'À risque',
+    description: 'Users avec un health score inférieur à 30',
+    filterRules: [
+      { field: 'healthScore', operator: 'less_than', value: 30 },
+    ],
+    userCount: 2,
+    createdAt: daysAgo(180),
+    isSystem: true,
+  },
+  {
+    id: 'seg_5',
+    name: 'Payants inactifs',
+    description: 'Users actifs mais pas connectés depuis 14+ jours',
+    filterRules: [
+      { field: 'status', operator: 'equals', value: 'active' },
+      { field: 'lastSeenDays', operator: 'greater_than', value: 14 },
+    ],
+    userCount: 0,
+    createdAt: daysAgo(90),
+    isSystem: true,
+  },
+  {
+    id: 'seg_6',
+    name: 'Nouveaux ce mois',
+    description: 'Users créés dans les 30 derniers jours',
+    filterRules: [
+      { field: 'createdDays', operator: 'less_than', value: 30 },
+    ],
+    userCount: 4,
+    createdAt: daysAgo(60),
+    isSystem: true,
+  },
+  {
+    id: 'seg_7',
+    name: 'Plan Growth+',
+    description: 'Users sur plan Growth, Team ou Scale',
+    filterRules: [
+      { field: 'plan', operator: 'in', value: ['growth', 'team', 'scale'] },
+    ],
+    userCount: 8,
+    createdAt: daysAgo(60),
+    isSystem: true,
+  },
+  {
+    id: 'seg_8',
+    name: 'Churnés récents',
+    description: 'Users churnés dans les 30 derniers jours',
+    filterRules: [
+      { field: 'status', operator: 'equals', value: 'churned' },
+    ],
+    userCount: 1,
+    createdAt: daysAgo(30),
+    isSystem: true,
+  },
+  {
+    id: 'seg_9',
+    name: 'Hot leads freemium',
+    description: 'Freemium avec limite atteinte, prêts pour upgrade',
+    filterRules: [
+      { field: 'status', operator: 'equals', value: 'freemium' },
+      { field: 'tag', operator: 'contains', value: 'limite-atteinte' },
+    ],
+    userCount: 1,
+    createdAt: daysAgo(15),
+    isSystem: false,
+  },
+  {
+    id: 'seg_10',
+    name: 'Power users',
+    description: 'Users très actifs avec health score > 85',
+    filterRules: [
+      { field: 'healthScore', operator: 'greater_than', value: 85 },
+    ],
+    userCount: 5,
+    createdAt: daysAgo(10),
+    isSystem: false,
+  },
+];
+
+export function getSegmentById(id: string): MockSegment | undefined {
+  return mockSegments.find(s => s.id === id);
+}
+
+// ============================================
+// NEW: Cohorts
+// ============================================
+
+export interface MockCohort {
+  id: string;
+  period: string; // "2024-01", "2024-02", etc.
+  usersCount: number;
+  retention: number[]; // [100, 85, 72, 65, 60, 58, 55, 52, 50, 48, 45, 43] — 12 mois
+  avgMrr: number;
+  avgLtv: number;
+  churnRate: number;
+}
+
+// Generate realistic cohorts for the last 12 months
+const generateCohorts = (): MockCohort[] => {
+  const cohorts: MockCohort[] = [];
+  const now = new Date();
+
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStr = date.toISOString().slice(0, 7); // "2024-01"
+
+    // Base values with some variance
+    const baseUsers = 80 + Math.floor(Math.random() * 60);
+
+    // Generate retention curve (diminishing)
+    const retention: number[] = [100];
+    let currentRetention = 100;
+    for (let m = 1; m <= 11; m++) {
+      if (m <= 12 - i) {
+        // Monthly drop between 5-15% initially, then 2-5% later
+        const drop = m <= 3 ? (5 + Math.random() * 10) : (2 + Math.random() * 3);
+        currentRetention = Math.max(30, currentRetention - drop);
+        retention.push(Math.round(currentRetention));
+      }
+    }
+
+    cohorts.push({
+      id: `cohort_${monthStr}`,
+      period: monthStr,
+      usersCount: baseUsers,
+      retention,
+      avgMrr: 45 + Math.floor(Math.random() * 30),
+      avgLtv: 180 + Math.floor(Math.random() * 150),
+      churnRate: 100 - retention[retention.length - 1],
+    });
+  }
+
+  return cohorts;
+};
+
+export const mockCohorts: MockCohort[] = generateCohorts();
+
+// ============================================
+// NEW: Automations
+// ============================================
+
+export interface AutomationTrigger {
+  type: 'event' | 'segment_enter' | 'segment_exit' | 'date_based';
+  event?: 'signup' | 'trial_started' | 'trial_ending' | 'payment_failed' | 'subscription_canceled' | 'inactive_7d' | 'inactive_14d' | 'plan_upgraded' | 'plan_downgraded' | 'limit_approaching';
+  segmentId?: string;
+  daysOffset?: number;
+}
+
+export interface AutomationStep {
+  id: string;
+  order: number;
+  type: 'wait' | 'email' | 'condition' | 'tag' | 'webhook';
+  config: {
+    days?: number;
+    hours?: number;
+    subject?: string;
+    templateId?: string;
+    field?: string;
+    operator?: string;
+    value?: string | number;
+    tagName?: string;
+    tagAction?: 'add' | 'remove';
+    webhookUrl?: string;
+  };
+  trueBranchSteps?: AutomationStep[];
+  falseBranchSteps?: AutomationStep[];
+}
+
+export interface MockAutomation {
+  id: string;
+  name: string;
+  description: string;
+  trigger: AutomationTrigger;
+  steps: AutomationStep[];
+  isActive: boolean;
+  isTemplate: boolean;
+  stats: {
+    sent: number;
+    opened: number;
+    clicked: number;
+    converted: number;
+    inProgress: number;
+  };
+  createdAt: string;
+}
+
+export const mockAutomations: MockAutomation[] = [
+  // 1. Onboarding Welcome
+  {
+    id: 'auto_1',
+    name: 'Onboarding Welcome',
+    description: 'Séquence de bienvenue pour les nouveaux inscrits',
+    trigger: { type: 'event', event: 'signup' },
+    steps: [
+      { id: 's1_1', order: 1, type: 'email', config: { subject: 'Bienvenue sur {app_name} !', templateId: 'welcome' } },
+      { id: 's1_2', order: 2, type: 'wait', config: { days: 2 } },
+      { id: 's1_3', order: 3, type: 'email', config: { subject: 'Comment ça se passe ?', templateId: 'checkin' } },
+      { id: 's1_4', order: 4, type: 'wait', config: { days: 5 } },
+      {
+        id: 's1_5',
+        order: 5,
+        type: 'condition',
+        config: { field: 'lastSeenDays', operator: 'greater_than', value: 5 },
+        trueBranchSteps: [
+          { id: 's1_5a', order: 1, type: 'email', config: { subject: 'On peut vous aider ?', templateId: 'reengagement' } },
+        ],
+        falseBranchSteps: [],
+      },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 12400, opened: 5580, clicked: 1240, converted: 620, inProgress: 847 },
+    createdAt: daysAgo(365),
+  },
+  // 2. Trial Nurturing
+  {
+    id: 'auto_2',
+    name: 'Trial Nurturing',
+    description: 'Accompagnement pendant la période de trial',
+    trigger: { type: 'event', event: 'trial_started' },
+    steps: [
+      { id: 's2_1', order: 1, type: 'email', config: { subject: '5 astuces pour bien démarrer', templateId: 'trial_tips_1' } },
+      { id: 's2_2', order: 2, type: 'wait', config: { days: 3 } },
+      { id: 's2_3', order: 3, type: 'email', config: { subject: 'Avez-vous essayé cette feature ?', templateId: 'trial_tips_2' } },
+      { id: 's2_4', order: 4, type: 'wait', config: { days: 7 } },
+      { id: 's2_5', order: 5, type: 'email', config: { subject: 'Votre trial expire bientôt', templateId: 'trial_ending' } },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 3200, opened: 1664, clicked: 480, converted: 192, inProgress: 52 },
+    createdAt: daysAgo(300),
+  },
+  // 3. Trial Ending Urgence
+  {
+    id: 'auto_3',
+    name: 'Trial Ending Urgence',
+    description: 'Séquence urgente 3 jours avant fin de trial',
+    trigger: { type: 'event', event: 'trial_ending' },
+    steps: [
+      { id: 's3_1', order: 1, type: 'email', config: { subject: '⏰ Plus que 3 jours de trial !', templateId: 'trial_urgency' } },
+      { id: 's3_2', order: 2, type: 'wait', config: { days: 1 } },
+      {
+        id: 's3_3',
+        order: 3,
+        type: 'condition',
+        config: { field: 'status', operator: 'equals', value: 'active' },
+        trueBranchSteps: [],
+        falseBranchSteps: [
+          { id: 's3_3a', order: 1, type: 'email', config: { subject: 'Dernière chance : -20% sur votre abonnement', templateId: 'trial_last_chance' } },
+        ],
+      },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 890, opened: 534, clicked: 178, converted: 89, inProgress: 12 },
+    createdAt: daysAgo(250),
+  },
+  // 4. Paiement échoué
+  {
+    id: 'auto_4',
+    name: 'Paiement échoué',
+    description: 'Relance après échec de paiement',
+    trigger: { type: 'event', event: 'payment_failed' },
+    steps: [
+      { id: 's4_1', order: 1, type: 'email', config: { subject: '⚠️ Problème avec votre paiement', templateId: 'payment_failed' } },
+      { id: 's4_2', order: 2, type: 'tag', config: { tagName: 'payment-issue', tagAction: 'add' } },
+      { id: 's4_3', order: 3, type: 'wait', config: { days: 2 } },
+      {
+        id: 's4_4',
+        order: 4,
+        type: 'condition',
+        config: { field: 'tag', operator: 'contains', value: 'payment-issue' },
+        trueBranchSteps: [
+          { id: 's4_4a', order: 1, type: 'email', config: { subject: 'Votre compte sera suspendu dans 5 jours', templateId: 'payment_reminder' } },
+          { id: 's4_4b', order: 2, type: 'wait', config: { days: 3 } },
+          { id: 's4_4c', order: 3, type: 'email', config: { subject: 'Dernier avertissement', templateId: 'payment_final' } },
+        ],
+        falseBranchSteps: [
+          { id: 's4_4d', order: 1, type: 'tag', config: { tagName: 'payment-issue', tagAction: 'remove' } },
+        ],
+      },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 456, opened: 365, clicked: 228, converted: 182, inProgress: 8 },
+    createdAt: daysAgo(200),
+  },
+  // 5. Réactivation inactifs
+  {
+    id: 'auto_5',
+    name: 'Réactivation inactifs',
+    description: 'Réengager les users inactifs depuis 14+ jours',
+    trigger: { type: 'event', event: 'inactive_14d' },
+    steps: [
+      { id: 's5_1', order: 1, type: 'email', config: { subject: 'On ne vous voit plus 😢', templateId: 'reengagement' } },
+      { id: 's5_2', order: 2, type: 'wait', config: { days: 5 } },
+      {
+        id: 's5_3',
+        order: 3,
+        type: 'condition',
+        config: { field: 'lastSeenDays', operator: 'greater_than', value: 14 },
+        trueBranchSteps: [
+          { id: 's5_3a', order: 1, type: 'email', config: { subject: '🎁 Offre spéciale : 1 mois gratuit', templateId: 'winback_offer' } },
+        ],
+        falseBranchSteps: [],
+      },
+    ],
+    isActive: false,
+    isTemplate: true,
+    stats: { sent: 890, opened: 267, clicked: 89, converted: 36, inProgress: 0 },
+    createdAt: daysAgo(180),
+  },
+  // 6. Churn Prevention
+  {
+    id: 'auto_6',
+    name: 'Churn Prevention',
+    description: 'Prévention du churn pour users à risque',
+    trigger: { type: 'segment_enter', segmentId: 'seg_4' },
+    steps: [
+      { id: 's6_1', order: 1, type: 'tag', config: { tagName: 'at_risk', tagAction: 'add' } },
+      { id: 's6_2', order: 2, type: 'email', config: { subject: 'Comment pouvons-nous vous aider ?', templateId: 'churn_prevention' } },
+      { id: 's6_3', order: 3, type: 'wait', config: { days: 3 } },
+      {
+        id: 's6_4',
+        order: 4,
+        type: 'condition',
+        config: { field: 'healthScore', operator: 'greater_than', value: 40 },
+        trueBranchSteps: [
+          { id: 's6_4a', order: 1, type: 'tag', config: { tagName: 'at_risk', tagAction: 'remove' } },
+        ],
+        falseBranchSteps: [
+          { id: 's6_4b', order: 1, type: 'webhook', config: { webhookUrl: 'https://slack.com/webhook/alert-churn' } },
+        ],
+      },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 234, opened: 152, clicked: 47, converted: 23, inProgress: 15 },
+    createdAt: daysAgo(150),
+  },
+  // 7. Upgrade Nudge
+  {
+    id: 'auto_7',
+    name: 'Upgrade Nudge',
+    description: 'Inciter à l\'upgrade quand limite atteinte',
+    trigger: { type: 'event', event: 'limit_approaching' },
+    steps: [
+      { id: 's7_1', order: 1, type: 'email', config: { subject: 'Vous approchez de votre limite', templateId: 'limit_warning' } },
+      { id: 's7_2', order: 2, type: 'wait', config: { days: 2 } },
+      { id: 's7_3', order: 3, type: 'email', config: { subject: '🚀 Passez au niveau supérieur', templateId: 'upgrade_proposal' } },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 567, opened: 340, clicked: 170, converted: 68, inProgress: 23 },
+    createdAt: daysAgo(120),
+  },
+  // 8. Anniversaire abonnement
+  {
+    id: 'auto_8',
+    name: 'Anniversaire abonnement',
+    description: 'Célébrer 1 an d\'abonnement',
+    trigger: { type: 'date_based', daysOffset: 365 },
+    steps: [
+      { id: 's8_1', order: 1, type: 'email', config: { subject: '🎉 1 an ensemble !', templateId: 'anniversary' } },
+      { id: 's8_2', order: 2, type: 'tag', config: { tagName: 'loyal_customer', tagAction: 'add' } },
+    ],
+    isActive: true,
+    isTemplate: true,
+    stats: { sent: 145, opened: 116, clicked: 58, converted: 29, inProgress: 0 },
+    createdAt: daysAgo(100),
+  },
+];
+
+export function getAutomationById(id: string): MockAutomation | undefined {
+  return mockAutomations.find(a => a.id === id);
+}
+
+export function getActiveAutomations(): MockAutomation[] {
+  return mockAutomations.filter(a => a.isActive);
+}
+
+export function getAutomationTemplates(): MockAutomation[] {
+  return mockAutomations.filter(a => a.isTemplate);
+}
+
+// ============================================
+// NEW: Coach Questions (contextual)
+// ============================================
+
+export interface CoachQuestion {
+  id: string;
+  context: 'dashboard' | 'user_detail' | 'cohorts' | 'segment' | 'automation' | 'alert' | 'email';
+  relatedTo?: string;
+  question: string;
+  mockAnswer: string;
+}
+
+export const coachQuestions: CoachQuestion[] = [
+  // Dashboard questions
+  {
+    id: 'cq_1',
+    context: 'dashboard',
+    relatedTo: 'churn',
+    question: 'Pourquoi mon churn a augmenté ce mois ?',
+    mockAnswer: `Votre churn a augmenté de 0.5% ce mois pour plusieurs raisons :\n\n**Causes principales identifiées :**\n1. **2 échecs de paiement** non résolus (marie@startup.fr, julien.blanc@corp.io)\n2. **Inactivité croissante** : 3 users payants n'ont pas été connectés depuis 14+ jours\n3. **Fin de trial sans conversion** : 2 trials ont expiré sans upgrade\n\n**Actions recommandées :**\n- Relancer immédiatement les 2 users en échec de paiement\n- Activer l'automation "Réactivation inactifs"\n- Analyser pourquoi les trials n'ont pas converti`,
+  },
+  {
+    id: 'cq_2',
+    context: 'dashboard',
+    relatedTo: 'trial_conversion',
+    question: 'Comment améliorer ma conversion trial ?',
+    mockAnswer: `Votre taux de conversion trial→paid est de 23%, légèrement au-dessus de la moyenne (15-25%).\n\n**Pour l'améliorer :**\n1. **Onboarding renforcé** : Vos users qui complètent l'onboarding convertissent 3x plus\n2. **Contact J+3** : Les trials contactés au jour 3 ont 40% plus de chances de convertir\n3. **Demo personnalisée** : Proposer un call pour les trials enterprise\n4. **Réduire les frictions** : 15% abandonnent à l'étape de paiement\n\n**Quick win :** Activez l'automation "Trial Nurturing" si ce n'est pas fait.`,
+  },
+  {
+    id: 'cq_3',
+    context: 'dashboard',
+    relatedTo: 'priority',
+    question: 'Quels users dois-je contacter en priorité ?',
+    mockAnswer: `**🔴 Urgence immédiate (aujourd'hui) :**\n1. **marie@startup.fr** — 3 paiements échoués, risque churn imminent\n2. **paul.moreau@acme.io** — Trial expire dans 2 jours, très engagé\n\n**🟡 Cette semaine :**\n3. **julien.blanc@corp.io** — Inactif 30 jours, compte Team (149€/mois)\n4. **pierre.leroy@free.fr** — Limite atteinte, prêt pour upgrade\n\n**🟢 À planifier :**\n5. **lea.martinez@company.com** — 1 an d'abo, envoyer félicitations`,
+  },
+  {
+    id: 'cq_4',
+    context: 'dashboard',
+    relatedTo: 'mrr',
+    question: 'Comment augmenter mon MRR rapidement ?',
+    mockAnswer: `Votre MRR actuel est de 1 241€ (+12% vs mois dernier). Voici comment l'accélérer :\n\n**Opportunités immédiates :**\n1. **Upgrades potentiels** : 4 users Starter approchent de leurs limites → +116€/mois si upgrade Growth\n2. **Freemium hot** : 2 freemium très actifs prêts pour Trial → potentiel +158€/mois\n3. **Récupération churn** : 1 user churné récemment, raison "prix" → offrir promo\n\n**Potentiel MRR additionnel : +274€/mois** si vous convertissez ces opportunités.`,
+  },
+  {
+    id: 'cq_5',
+    context: 'dashboard',
+    relatedTo: 'health',
+    question: 'Quel est l\'état de santé de ma base users ?',
+    mockAnswer: `**Vue d'ensemble :**\n- 🟢 **Excellente santé (>70)** : 12 users (60%)\n- 🟡 **Attention (40-70)** : 5 users (25%)\n- 🔴 **À risque (<40)** : 3 users (15%)\n\n**Répartition par statut :**\n- Freemium : 6 users, santé moyenne 57\n- Trial : 3 users, santé moyenne 73 (bon signe !)\n- Active : 7 users, santé moyenne 84\n- At risk : 2 users, santé moyenne 30\n\n**Tendance :** Légère amélioration vs mois dernier (+2 points moyens)`,
+  },
+
+  // User detail questions
+  {
+    id: 'cq_10',
+    context: 'user_detail',
+    question: 'Quel est le risque de churn de ce user ?',
+    mockAnswer: `**Analyse du risque de churn :**\n\nBasé sur les signaux comportementaux, ce user présente un risque **modéré à élevé** :\n\n**Signaux négatifs :**\n- Baisse d'activité de 35% sur 2 semaines\n- 0 features premium utilisées ce mois\n- Pas de réponse aux 2 derniers emails\n\n**Signaux positifs :**\n- Abonné depuis 8 mois (engagement long terme)\n- Jamais eu d'échec de paiement\n\n**Score de risque : 65/100**\n\n**Recommandation :** Contact proactif dans les 48h pour comprendre ses besoins.`,
+  },
+  {
+    id: 'cq_11',
+    context: 'user_detail',
+    question: 'Quel email lui envoyer ?',
+    mockAnswer: `Basé sur le profil et l'historique de ce user, je recommande :\n\n**Template suggéré : "Check-in personnalisé"**\n\n---\n**Objet :** {prénom}, on peut en parler ?\n\nSalut {prénom},\n\nJ'ai remarqué que tu utilises moins {app_name} ces derniers temps. Est-ce qu'il y a quelque chose qu'on pourrait améliorer ?\n\nSi tu as 15 min cette semaine, je serais ravi d'échanger.\n\n[Réserver un call]\n\n---\n\n**Pourquoi ce template ?**\n- Ton personnalisé et non-commercial\n- Invite au dialogue\n- Permet d'identifier les blocages`,
+  },
+  {
+    id: 'cq_12',
+    context: 'user_detail',
+    question: 'Pourquoi son health score est bas ?',
+    mockAnswer: `**Diagnostic du health score (35/100) :**\n\n**Facteurs négatifs (impact) :**\n1. **Inactivité** (-30 pts) : Dernière connexion il y a 15 jours\n2. **Features inutilisées** (-20 pts) : 0/5 features premium utilisées ce mois\n3. **Échec paiement** (-15 pts) : 3 tentatives échouées\n\n**Facteurs neutres/positifs :**\n- Ancienneté OK : 4 mois\n- Pas de tickets support ouverts\n\n**Pour améliorer le score :**\n1. Résoudre le problème de paiement (priorité)\n2. Encourager la reconnexion\n3. Proposer une formation sur les features`,
+  },
+  {
+    id: 'cq_13',
+    context: 'user_detail',
+    question: 'Dois-je lui proposer un upgrade ?',
+    mockAnswer: `**Analyse d'opportunité upgrade :**\n\n**Signaux positifs pour upgrade :**\n✅ Utilise 85% de sa limite projets (8/10)\n✅ Connecté 12 fois ce mois\n✅ A déjà regardé la page pricing 2 fois\n\n**Signaux négatifs :**\n❌ Jamais utilisé les features premium\n❌ Petit compte (1 seul membre)\n\n**Verdict : Oui, mais avec approche "valeur"**\n\nNe pas pusher l'upgrade directement. Plutôt :\n1. Proposer un essai gratuit de la feature API\n2. Montrer un cas d'usage pertinent pour son industrie\n3. Offrir -20% sur le premier mois Growth`,
+  },
+
+  // Cohorts questions
+  {
+    id: 'cq_20',
+    context: 'cohorts',
+    question: 'Quelle cohorte performe le mieux ?',
+    mockAnswer: `**Analyse des cohortes (12 derniers mois) :**\n\n🏆 **Meilleure cohorte : Avril 2024**\n- Rétention M6 : 68% (vs moyenne 58%)\n- LTV moyen : 320€ (vs moyenne 245€)\n- Churn rate : 32% (vs moyenne 42%)\n\n**Pourquoi cette cohorte performe ?**\n1. Lancée avec le nouvel onboarding\n2. Campagne d'acquisition ciblée (SaaS B2B)\n3. Feature "Quick Start" introduite ce mois\n\n**À reproduire :**\n- Ciblage similaire pour les prochaines campagnes\n- Onboarding renforcé déjà actif`,
+  },
+  {
+    id: 'cq_21',
+    context: 'cohorts',
+    question: 'Pourquoi la rétention M3 est faible ?',
+    mockAnswer: `**Analyse de la chute M3 :**\n\nLa rétention moyenne passe de 75% (M2) à 65% (M3), une chute de 10 points.\n\n**Causes identifiées :**\n1. **Fin de "honeymoon"** : Les users découvrent les limitations du plan\n2. **Pas de valeur ajoutée** : 40% des churns M3 n'ont jamais utilisé une feature clé\n3. **Cycle de facturation** : Beaucoup réalisent le coût réel à M3\n\n**Solutions :**\n1. Email "Quick wins" à M2 pour montrer la valeur\n2. Check-in call à M2.5 pour les comptes > 50€/mois\n3. Feature discovery automation à activer`,
+  },
+  {
+    id: 'cq_22',
+    context: 'cohorts',
+    question: 'Comment améliorer la rétention globale ?',
+    mockAnswer: `**Plan d'amélioration de la rétention :**\n\n**Quick wins (impact rapide) :**\n1. ✅ Activer "Trial Nurturing" automation\n2. ✅ Email de check-in à J+7\n3. ✅ Onboarding gamifié (progress bar)\n\n**Moyen terme :**\n1. Identifier les "aha moments" et y amener plus vite\n2. Créer un programme de fidélité (rewards)\n3. Communauté Slack/Discord pour engagement\n\n**Impact estimé :**\n- +5-10% rétention M3 avec quick wins\n- +15-20% rétention M12 avec programme complet`,
+  },
+
+  // Automation questions
+  {
+    id: 'cq_30',
+    context: 'automation',
+    question: 'Quelle automation a le meilleur ROI ?',
+    mockAnswer: `**Classement ROI des automations actives :**\n\n🥇 **Paiement échoué** — ROI 890%\n- 182 users sauvés sur 456 contactés\n- Revenue récupéré : ~8 500€\n\n🥈 **Trial Ending Urgence** — ROI 420%\n- 89 conversions sur 890 envois\n- Revenue généré : ~4 200€\n\n🥉 **Upgrade Nudge** — ROI 340%\n- 68 upgrades sur 567 envois\n- Revenue additionnel : ~2 700€\n\n**À améliorer :** "Réactivation inactifs" (36% conversion seulement)`,
+  },
+  {
+    id: 'cq_31',
+    context: 'automation',
+    question: 'Comment améliorer le taux d\'ouverture ?',
+    mockAnswer: `**Vos taux d'ouverture actuels :**\n- Moyenne : 45% (bon !)\n- Meilleur : "Paiement échoué" (80%)\n- Pire : "Réactivation" (30%)\n\n**Tips pour améliorer :**\n\n1. **Objets email :**\n   - Ajouter le prénom : +15%\n   - Urgence (⏰, ⚠️) : +20%\n   - Curiosité ("Une question...") : +25%\n\n2. **Timing :**\n   - Mardi/Mercredi 10h : +18%\n   - Éviter lundi matin et vendredi PM\n\n3. **Segmentation :**\n   - Personnaliser par plan/usage : +30%`,
+  },
+  {
+    id: 'cq_32',
+    context: 'automation',
+    question: 'Dois-je ajouter une automation pour les churns ?',
+    mockAnswer: `**Analyse : Automation win-back churn**\n\n**Situation actuelle :**\n- 2 users churnés ce mois\n- Aucune automation de récupération active\n- Potentiel récupérable : ~500€/mois\n\n**Recommandation : OUI, créer une automation**\n\n**Séquence suggérée :**\n1. J+1 : "On est tristes de vous voir partir"\n2. J+7 : "Qu'est-ce qu'on aurait pu faire mieux ?"\n3. J+30 : "🎁 Offre de retour : -30% pendant 3 mois"\n\n**ROI estimé :** 15-25% de récupération → 75-125€/mois`,
+  },
+
+  // Segment questions
+  {
+    id: 'cq_40',
+    context: 'segment',
+    question: 'Quel segment cibler pour une campagne promo ?',
+    mockAnswer: `**Recommandation de ciblage promo :**\n\n🎯 **Segment idéal : "Freemium actifs"**\n- 4 users très engagés\n- Coût d'acquisition déjà amorti\n- Conversion historique : 35%\n\n**Alternative : "Hot leads freemium"**\n- 1 user avec limite atteinte\n- Prêt à payer, juste besoin d'un push\n\n**Éviter :**\n- "Churnés récents" → trop tôt\n- "À risque" → focus rétention d'abord\n\n**Offre suggérée :** -20% sur Starter pendant 3 mois`,
+  },
+  {
+    id: 'cq_41',
+    context: 'segment',
+    question: 'Comment réduire ce segment à risque ?',
+    mockAnswer: `**Plan de réduction du segment "À risque" :**\n\n**Users concernés (2) :**\n1. marie@startup.fr — Paiement échoué\n2. julien.blanc@corp.io — Inactif 30j\n\n**Actions immédiates :**\n\n**Pour Marie :**\n- Appel téléphonique (priorité haute)\n- Proposer paiement différé ou plan réduit\n- Deadline : 48h\n\n**Pour Julien :**\n- Email personnalisé "On peut en parler ?"\n- Proposer call de 15 min\n- Offrir 1 mois gratuit si réactivation\n\n**Objectif :** Réduire le segment à 0 en 2 semaines`,
+  },
+
+  // Alert questions
+  {
+    id: 'cq_50',
+    context: 'alert',
+    question: 'Comment prioriser ces alertes ?',
+    mockAnswer: `**Priorisation des alertes actives :**\n\n**🔴 CRITIQUE (traiter aujourd'hui) :**\n1. Paiement échoué marie@startup.fr — 3ème échec\n2. Carte expire dans 5j marie@startup.fr\n\n**🟡 IMPORTANT (cette semaine) :**\n3. Trial expire paul.moreau@acme.io — 2 jours\n4. Inactif 30j julien.blanc@corp.io\n\n**🟢 À PLANIFIER :**\n5. Anniversaire 1 an lea.martinez@company.com\n6. Limite atteinte pierre.leroy@free.fr\n\n**Temps estimé :** 2h pour les critiques, 1h pour les importants`,
+  },
+
+  // Email questions
+  {
+    id: 'cq_60',
+    context: 'email',
+    question: 'Quel est le meilleur moment pour envoyer ?',
+    mockAnswer: `**Analyse de vos envois précédents :**\n\n**Meilleurs moments :**\n🥇 Mardi 10h-11h : 52% ouverture\n🥈 Mercredi 14h-15h : 48% ouverture\n🥉 Jeudi 10h-11h : 45% ouverture\n\n**À éviter :**\n❌ Lundi matin : 28% ouverture\n❌ Vendredi 17h+ : 22% ouverture\n❌ Week-end : 15% ouverture\n\n**Recommandation :**\nProgrammer vos campagnes le **mardi à 10h** pour maximiser l'impact.`,
+  },
+  {
+    id: 'cq_61',
+    context: 'email',
+    question: 'Comment améliorer mes taux de clic ?',
+    mockAnswer: `**Vos stats actuelles :**\n- Taux de clic moyen : 8%\n- Meilleure campagne : 18% (Black Friday)\n- Pire : 3% (Newsletter standard)\n\n**Tips pour améliorer :**\n\n1. **CTA clair et unique**\n   - 1 seul bouton par email\n   - Texte action : "Réserver mon call" > "Cliquez ici"\n\n2. **Design**\n   - Bouton contrasté et grand\n   - Au-dessus de la ligne de flottaison\n\n3. **Contenu**\n   - Créer de l'urgence (deadline)\n   - Personnaliser l'offre\n\n**Objectif réaliste :** 12-15% taux de clic`,
+  },
+];
+
+export function getCoachQuestionsByContext(context: CoachQuestion['context']): CoachQuestion[] {
+  return coachQuestions.filter(q => q.context === context);
+}
+
+// ============================================
+// NEW: Email Campaigns
+// ============================================
+
+export interface MockCampaign {
+  id: string;
+  name: string;
+  subject: string;
+  previewText?: string;
+  segmentId: string;
+  segmentName: string;
+  recipientCount: number;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent';
+  scheduledAt?: string;
+  sentAt?: string;
+  stats?: {
+    delivered: number;
+    opened: number;
+    clicked: number;
+    unsubscribed: number;
+  };
+  createdAt: string;
+}
+
+export const mockCampaigns: MockCampaign[] = [
+  {
+    id: 'camp_1',
+    name: 'Nouvelle feature : Export PDF amélioré',
+    subject: '🚀 Nouvelle feature : Export PDF amélioré',
+    previewText: 'Découvrez les nouvelles options d\'export...',
+    segmentId: 'seg_7',
+    segmentName: 'Plan Growth+',
+    recipientCount: 8,
+    status: 'sent',
+    sentAt: daysAgo(3),
+    stats: { delivered: 8, opened: 5, clicked: 2, unsubscribed: 0 },
+    createdAt: daysAgo(5),
+  },
+  {
+    id: 'camp_2',
+    name: 'Black Friday -30%',
+    subject: '🔥 Black Friday : -30% sur tous les plans !',
+    previewText: 'Offre exceptionnelle valable 48h seulement',
+    segmentId: 'seg_2',
+    segmentName: 'Freemium actifs',
+    recipientCount: 4,
+    status: 'sent',
+    sentAt: daysAgo(45),
+    stats: { delivered: 4, opened: 3, clicked: 1, unsubscribed: 0 },
+    createdAt: daysAgo(50),
+  },
+  {
+    id: 'camp_3',
+    name: 'Newsletter Janvier 2025',
+    subject: '📰 Les nouveautés de janvier',
+    previewText: 'Retour sur les features du mois...',
+    segmentId: 'seg_1',
+    segmentName: 'Tous les users',
+    recipientCount: 20,
+    status: 'scheduled',
+    scheduledAt: daysFromNow(1),
+    createdAt: daysAgo(2),
+  },
+  {
+    id: 'camp_4',
+    name: 'Promo upgrade Starter→Growth',
+    subject: 'Passez à Growth : -20% ce mois',
+    segmentId: 'seg_9',
+    segmentName: 'Hot leads freemium',
+    recipientCount: 1,
+    status: 'draft',
+    createdAt: daysAgo(1),
+  },
+];
+
+export function getCampaignById(id: string): MockCampaign | undefined {
+  return mockCampaigns.find(c => c.id === id);
+}
