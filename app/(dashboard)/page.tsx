@@ -1,15 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { getStats, mockUsers, mockAlerts, mrrHistory, formatCurrency, getUserById } from '@/lib/mock-data';
+import { getStats, mockAlerts, mrrHistory, formatCurrency, getUserById } from '@/lib/mock-data';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const stats = getStats();
-  const [isCoachOpen, setIsCoachOpen] = useState(false);
 
   // Get urgent alerts for the todo list
   const urgentAlerts = mockAlerts
@@ -131,12 +129,9 @@ export default function DashboardPage() {
                 </p>
               ))}
             </div>
-            <button
-              onClick={() => setIsCoachOpen(true)}
-              className="mt-4 w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-            >
-              Parler au coach
-            </button>
+            <p className="mt-4 text-xs text-indigo-600">
+              Clique sur le bouton ✨ en bas à droite pour parler au coach
+            </p>
           </Card>
         </div>
       </div>
@@ -202,60 +197,6 @@ export default function DashboardPage() {
       >
         Voir tous les users →
       </Link>
-
-      {/* Coach Chat Modal - Placeholder */}
-      {isCoachOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">✨</span>
-                <h3 className="font-semibold text-gray-900">Coach Abo</h3>
-              </div>
-              <button
-                onClick={() => setIsCoachOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto">
-              <div className="bg-indigo-50 rounded-lg p-3 mb-4">
-                <p className="text-sm text-indigo-800">
-                  Bonjour ! Je suis ton coach IA. Je peux t&apos;aider à réduire ton churn,
-                  améliorer tes conversions, et optimiser ta stratégie d&apos;abonnements.
-                </p>
-              </div>
-              <div className="space-y-2">
-                {['Comment réduire mon churn ?', 'Analyse mes users à risque', 'Génère un email de relance'].map((q) => (
-                  <button
-                    key={q}
-                    className="w-full text-left px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 border-t">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Pose ta question..."
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,5 +1,8 @@
+'use client';
+
 import { Navigation } from '@/components/nav';
 import { UserMenu } from '@/components/user-menu';
+import { Coach } from '@/components/coach';
 
 // Mock user for demo purposes
 const mockCurrentUser = {
@@ -25,6 +28,9 @@ export default function DashboardLayout({
       <main className="pt-16 pb-20 md:pb-6 md:pl-64">
         <div className="p-6">{children}</div>
       </main>
+
+      {/* Global Coach IA */}
+      <Coach />
     </div>
   );
 }
