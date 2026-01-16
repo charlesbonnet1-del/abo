@@ -1,8 +1,8 @@
 import { HTMLAttributes } from 'react';
-import { SubscriberStatus } from '@prisma/client';
+import type { UserStatus, PlanType } from '@/lib/mock-data';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray';
 }
 
 export function Badge({
@@ -17,6 +17,7 @@ export function Badge({
     warning: 'bg-yellow-100 text-yellow-700',
     danger: 'bg-red-100 text-red-700',
     info: 'bg-blue-100 text-blue-700',
+    gray: 'bg-gray-100 text-gray-500',
   };
 
   return (
@@ -29,25 +30,50 @@ export function Badge({
   );
 }
 
-export function StatusBadge({ status }: { status: SubscriberStatus }) {
-  const config: Record<SubscriberStatus, { variant: BadgeProps['variant']; label: string }> = {
-    ACTIVE: { variant: 'success', label: 'Actif' },
-    AT_RISK: { variant: 'warning', label: 'À risque' },
-    TRIAL: { variant: 'info', label: 'Trial' },
-    CHURNED: { variant: 'default', label: 'Churné' },
+export function StatusBadge({ status }: { status: UserStatus }) {
+  const config: Record<UserStatus, { variant: BadgeProps['variant']; label: string }> = {
+    freemium: { variant: 'gray', label: 'Freemium' },
+    trial: { variant: 'warning', label: 'Trial' },
+    active: { variant: 'success', label: 'Actif' },
+    at_risk: { variant: 'danger', label: 'À risque' },
+    churned: { variant: 'default', label: 'Churné' },
   };
 
   const { variant, label } = config[status];
-
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-export function StatusDot({ status }: { status: SubscriberStatus }) {
-  const colors: Record<SubscriberStatus, string> = {
-    ACTIVE: 'bg-green-500',
-    AT_RISK: 'bg-yellow-500',
-    TRIAL: 'bg-blue-500',
-    CHURNED: 'bg-gray-400',
+export function PlanBadge({ plan }: { plan: PlanType }) {
+  const planNames: Record<PlanType, string> = {
+    free: 'Free',
+    starter: 'Starter',
+    growth: 'Growth',
+    team: 'Team',
+    scale: 'Scale',
+  };
+
+  const variant = plan === 'free' ? 'gray' : plan === 'scale' ? 'info' : 'default';
+  return <Badge variant={variant}>{planNames[plan]}</Badge>;
+}
+
+export function SeverityBadge({ severity }: { severity: 'info' | 'warning' | 'critical' }) {
+  const config = {
+    info: { label: 'INFO', variant: 'info' as const },
+    warning: { label: 'WARNING', variant: 'warning' as const },
+    critical: { label: 'CRITIQUE', variant: 'danger' as const },
+  };
+
+  const { label, variant } = config[severity];
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+export function StatusDot({ status }: { status: UserStatus }) {
+  const colors: Record<UserStatus, string> = {
+    freemium: 'bg-gray-400',
+    trial: 'bg-yellow-500',
+    active: 'bg-green-500',
+    at_risk: 'bg-orange-500',
+    churned: 'bg-red-500',
   };
 
   return (
