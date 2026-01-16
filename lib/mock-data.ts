@@ -1024,11 +1024,9 @@ const generateCohorts = (): MockCohort[] => {
   for (let i = 11; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthStr = date.toISOString().slice(0, 7); // "2024-01"
-    const monthsElapsed = i;
 
     // Base values with some variance
     const baseUsers = 80 + Math.floor(Math.random() * 60);
-    const baseRetention = 85 + Math.floor(Math.random() * 10);
 
     // Generate retention curve (diminishing)
     const retention: number[] = [100];
