@@ -2,296 +2,332 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { mockUsers, emailTemplates } from '@/lib/mock-data';
-import { Card } from '@/components/ui/card';
+import {
+  EmailBlock,
+  EmailRecipient,
+  BlocksPalette,
+  EmailCanvas,
+  BlockEditor,
+  RecipientSelector,
+  blockTemplates,
+} from '@/components/email-builder';
 
-const templateContent: Record<string, { subject: string; body: string }> = {
-  welcome: {
-    subject: 'Bienvenue sur Abo, {name}!',
-    body: `Bonjour {name},
-
-Bienvenue sur Abo ! Nous sommes ravis de vous compter parmi nous.
-
-Votre compte {company} est maintenant actif et prêt à être utilisé.
-
-Pour commencer, voici quelques ressources utiles :
-- Guide de démarrage
-- Documentation API
-- Support
-
-Si vous avez la moindre question, n'hésitez pas à nous contacter.
-
-À bientôt,
-L'équipe Abo`,
+// Default email template
+const defaultBlocks: EmailBlock[] = [
+  {
+    id: '1',
+    type: 'header',
+    content: 'Bienvenue {name} !',
+    level: 'h1',
+    align: 'center',
+    color: '#1f2937',
   },
-  trial_ending: {
-    subject: 'Votre trial expire dans {days} jours',
-    body: `Bonjour {name},
-
-Votre période d'essai sur Abo se termine dans {days} jours.
-
-Vous avez adoré utiliser :
-- La gestion des abonnements
-- Les alertes automatiques
-- Le tableau de bord
-
-Pour continuer à profiter de toutes ces fonctionnalités, passez à un plan payant dès maintenant.
-
-Cordialement,
-L'équipe Abo`,
+  {
+    id: '2',
+    type: 'text',
+    content: 'Nous sommes ravis de vous compter parmi nous chez {company}.\n\nVotre compte est maintenant actif et pret a etre utilise.',
+    align: 'left',
+    fontSize: 'medium',
+    color: '#374151',
   },
-  payment_failed: {
-    subject: 'Action requise : mettre à jour votre moyen de paiement',
-    body: `Bonjour {name},
-
-Nous avons rencontré un problème lors du prélèvement de votre abonnement.
-
-Pour éviter toute interruption de service, merci de mettre à jour vos informations de paiement.
-
-[Mettre à jour mon paiement]
-
-Si vous avez des questions, contactez-nous.
-
-L'équipe Abo`,
+  {
+    id: '3',
+    type: 'button',
+    text: 'Commencer maintenant',
+    url: 'https://app.abo.io',
+    backgroundColor: '#4f46e5',
+    textColor: '#ffffff',
+    borderRadius: 'medium',
+    align: 'center',
+    fullWidth: false,
   },
-  reengagement: {
-    subject: '{name}, vous nous manquez !',
-    body: `Bonjour {name},
-
-Cela fait un moment que nous ne vous avons pas vu sur Abo.
-
-Nous avons ajouté de nouvelles fonctionnalités qui pourraient vous intéresser :
-- Coach IA intégré
-- Nouveaux rapports
-- Intégrations améliorées
-
-Reconnectez-vous et découvrez les nouveautés !
-
-À bientôt,
-L'équipe Abo`,
+  {
+    id: '4',
+    type: 'spacer',
+    height: 24,
   },
-  anniversary: {
-    subject: 'Joyeux anniversaire {name} ! 🎂',
-    body: `Bonjour {name},
-
-Ça fait déjà 1 an que vous êtes avec nous !
-
-Merci pour votre fidélité. Pour célébrer, voici un code promo de 20% sur votre prochain mois : MERCI20
-
-Continuez à grandir avec Abo !
-
-L'équipe Abo`,
+  {
+    id: '5',
+    type: 'footer',
+    companyName: 'Abo',
+    address: '123 rue de la Startup, 75001 Paris',
+    unsubscribeText: 'Se desabonner',
+    showUnsubscribe: true,
   },
-  upgrade_proposal: {
-    subject: 'Débloquez plus de fonctionnalités avec {plan}',
-    body: `Bonjour {name},
-
-Vous avez atteint les limites de votre plan actuel.
-
-Passez au plan {plan} pour débloquer :
-- Plus de projets
-- Plus de membres
-- Fonctionnalités avancées
-
-Profitez de 10% de réduction avec le code UPGRADE10.
-
-À bientôt,
-L'équipe Abo`,
-  },
-};
+];
 
 export default function EmailEditorPage() {
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [selectedUser, setSelectedUser] = useState<string>('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [blocks, setBlocks] = useState<EmailBlock[]>(defaultBlocks);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
+  const [subject, setSubject] = useState('Bienvenue sur Abo, {name}!');
+  const [previewMode, setPreviewMode] = useState(false);
 
-  const handleTemplateSelect = (templateId: string) => {
-    setSelectedTemplate(templateId);
-    const content = templateContent[templateId];
-    if (content) {
-      setSubject(content.subject);
-      setBody(content.body);
-    }
+  const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
+
+  const previewVariables = {
+    name: 'Jean Dupont',
+    company: 'Acme Corp',
+    plan: 'Growth',
+    email: 'jean@acme.com',
+    days: '3',
   };
 
-  const insertVariable = (variable: string) => {
-    setBody((prev) => prev + `{${variable}}`);
+  const handleAddBlock = (block: EmailBlock) => {
+    setBlocks([...blocks, block]);
+    setSelectedBlockId(block.id);
+  };
+
+  const handleUpdateBlock = (updatedBlock: EmailBlock) => {
+    setBlocks(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
   };
 
   const handleSend = () => {
-    alert('Email envoyé (simulation)');
-    console.log({ to: selectedUser, subject, body });
+    const totalRecipients = recipients.reduce((sum, r) => sum + r.count, 0);
+    alert(`Email envoye a ${totalRecipients} destinataires (simulation)`);
+    console.log({ recipients, subject, blocks });
   };
 
   const handleSendTest = () => {
-    alert('Email de test envoyé à demo@abo.app (simulation)');
+    alert('Email de test envoye a demo@abo.app (simulation)');
   };
 
   const handleSaveTemplate = () => {
-    alert('Template sauvegardé (simulation)');
+    alert('Template sauvegarde (simulation)');
+    console.log({ subject, blocks });
   };
 
-  // Preview with replaced variables
-  const selectedUserData = mockUsers.find((u) => u.id === selectedUser);
-  const previewBody = body
-    .replace(/{name}/g, selectedUserData?.name || 'John Doe')
-    .replace(/{company}/g, selectedUserData?.company || 'Acme Corp')
-    .replace(/{email}/g, selectedUserData?.email || 'john@example.com')
-    .replace(/{plan}/g, 'Growth')
-    .replace(/{days}/g, '3');
+  const handleLoadTemplate = (templateType: string) => {
+    switch (templateType) {
+      case 'welcome':
+        setBlocks([
+          {
+            id: crypto.randomUUID(),
+            type: 'header' as const,
+            content: 'Bienvenue {name} !',
+            level: 'h1' as const,
+            align: 'center' as const,
+            color: '#1f2937',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'text' as const,
+            content: 'Nous sommes ravis de vous compter parmi nous.\n\nVotre compte est maintenant actif.',
+            align: 'left' as const,
+            fontSize: 'medium' as const,
+            color: '#374151',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'button' as const,
+            text: 'Commencer',
+            url: 'https://app.abo.io',
+            backgroundColor: '#4f46e5',
+            textColor: '#ffffff',
+            borderRadius: 'medium' as const,
+            align: 'center' as const,
+            fullWidth: false,
+          },
+          blockTemplates.footer(),
+        ]);
+        setSubject('Bienvenue sur Abo, {name}!');
+        break;
+
+      case 'trial_ending':
+        setBlocks([
+          {
+            id: crypto.randomUUID(),
+            type: 'header' as const,
+            content: 'Votre trial expire bientot',
+            level: 'h2' as const,
+            align: 'center' as const,
+            color: '#1f2937',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'text' as const,
+            content: 'Bonjour {name},\n\nVotre periode d\'essai expire dans quelques jours.\n\nNe perdez pas acces a toutes vos donnees et fonctionnalites.',
+            align: 'left' as const,
+            fontSize: 'medium' as const,
+            color: '#374151',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'button' as const,
+            text: 'Passer au plan payant',
+            url: 'https://example.com',
+            backgroundColor: '#059669',
+            textColor: '#ffffff',
+            borderRadius: 'medium' as const,
+            align: 'center' as const,
+            fullWidth: false,
+          },
+          blockTemplates.spacer(),
+          blockTemplates.footer(),
+        ]);
+        setSubject('Votre trial expire dans {days} jours');
+        break;
+
+      case 'reengagement':
+        setBlocks([
+          {
+            id: crypto.randomUUID(),
+            type: 'header' as const,
+            content: '{name}, vous nous manquez !',
+            level: 'h1' as const,
+            align: 'center' as const,
+            color: '#1f2937',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'text' as const,
+            content: 'Cela fait un moment que nous ne vous avons pas vu.\n\nNous avons ajoute de nouvelles fonctionnalites qui pourraient vous interesser.',
+            align: 'left' as const,
+            fontSize: 'medium' as const,
+            color: '#374151',
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'button' as const,
+            text: 'Decouvrir les nouveautes',
+            url: 'https://example.com',
+            backgroundColor: '#7c3aed',
+            textColor: '#ffffff',
+            borderRadius: 'medium' as const,
+            align: 'center' as const,
+            fullWidth: false,
+          },
+          blockTemplates.divider(),
+          {
+            id: crypto.randomUUID(),
+            type: 'text' as const,
+            content: 'A bientot,\nL\'equipe Abo',
+            align: 'left' as const,
+            fontSize: 'small' as const,
+            color: '#374151',
+          },
+          blockTemplates.footer(),
+        ]);
+        setSubject('{name}, vous nous manquez !');
+        break;
+
+      default:
+        setBlocks(defaultBlocks);
+    }
+
+    setSelectedBlockId(null);
+  };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="h-[calc(100vh-80px)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/emails"
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Éditeur Email</h1>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSaveTemplate}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Sauvegarder template
-          </button>
-          <button
-            onClick={handleSendTest}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Envoyer test
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!selectedUser}
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Envoyer
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Editor */}
-        <div className="space-y-4">
-          {/* Recipient */}
-          <Card>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Destinataire</label>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/emails"
+              className="text-gray-400 hover:text-gray-600"
             >
-              <option value="">Sélectionner un user...</option>
-              {mockUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} ({user.email})
-                </option>
-              ))}
-            </select>
-          </Card>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Email Builder</h1>
+              <p className="text-sm text-gray-500">Glissez-deposez pour creer votre email</p>
+            </div>
+          </div>
 
-          {/* Template */}
-          <Card>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Template</label>
+          <div className="flex items-center gap-4">
+            {/* Template selector */}
             <select
-              value={selectedTemplate}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => e.target.value && handleLoadTemplate(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              defaultValue=""
             >
-              <option value="">Choisir un template...</option>
-              {emailTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
+              <option value="" disabled>Charger un template...</option>
+              <option value="welcome">Bienvenue</option>
+              <option value="trial_ending">Trial expire</option>
+              <option value="reengagement">Reengagement</option>
             </select>
-          </Card>
 
-          {/* Subject */}
-          <Card>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sujet</label>
+            <button
+              onClick={() => setPreviewMode(!previewMode)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                previewMode
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {previewMode ? 'Mode edition' : 'Apercu'}
+            </button>
+
+            <button
+              onClick={handleSaveTemplate}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Sauvegarder
+            </button>
+            <button
+              onClick={handleSendTest}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Envoyer test
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={recipients.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Envoyer
+            </button>
+          </div>
+        </div>
+
+        {/* Subject & Recipients row */}
+        <div className="mt-4 grid grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sujet de l&apos;email
+            </label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Sujet de l'email..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-          </Card>
-
-          {/* Body */}
-          <Card>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Contenu</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => insertVariable('name')}
-                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
-                >
-                  {'{name}'}
-                </button>
-                <button
-                  onClick={() => insertVariable('company')}
-                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
-                >
-                  {'{company}'}
-                </button>
-                <button
-                  onClick={() => insertVariable('plan')}
-                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
-                >
-                  {'{plan}'}
-                </button>
-              </div>
-            </div>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={12}
-              placeholder="Contenu de l'email..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
-            />
-          </Card>
+            <p className="text-xs text-gray-500 mt-1">
+              Apercu: {subject.replace(/{name}/g, previewVariables.name).replace(/{days}/g, previewVariables.days)}
+            </p>
+          </div>
+          <RecipientSelector
+            selectedRecipients={recipients}
+            onSelectRecipients={setRecipients}
+          />
         </div>
+      </div>
 
-        {/* Preview */}
-        <div>
-          <Card className="sticky top-24">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Aperçu</h2>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="mb-4 pb-4 border-b border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">À:</p>
-                <p className="text-sm text-gray-900">
-                  {selectedUserData?.email || 'destinataire@exemple.com'}
-                </p>
-              </div>
-              <div className="mb-4 pb-4 border-b border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Sujet:</p>
-                <p className="text-sm font-medium text-gray-900">
-                  {subject
-                    .replace(/{name}/g, selectedUserData?.name || 'John Doe')
-                    .replace(/{days}/g, '3')
-                    .replace(/{plan}/g, 'Growth') || 'Sujet de l\'email'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-2">Contenu:</p>
-                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {previewBody || 'Le contenu de l\'email apparaîtra ici...'}
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
+        {!previewMode && (
+          <BlocksPalette onAddBlock={handleAddBlock} />
+        )}
+
+        <EmailCanvas
+          blocks={blocks}
+          selectedBlockId={previewMode ? null : selectedBlockId}
+          onSelectBlock={previewMode ? () => {} : setSelectedBlockId}
+          onUpdateBlocks={setBlocks}
+          previewVariables={previewVariables}
+        />
+
+        {!previewMode && (
+          <BlockEditor
+            block={selectedBlock}
+            onUpdateBlock={handleUpdateBlock}
+          />
+        )}
       </div>
     </div>
   );
