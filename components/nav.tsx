@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
     children: [
       { href: '/settings', label: 'Plans & Features' },
       { href: '/settings/promotions', label: 'Promotions' },
+      { href: '/settings/attributes', label: 'Attributs users' },
       { href: '/settings/integrations', label: 'Integrations' },
     ],
   },

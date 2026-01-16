@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, notFound } from 'next/navigation';
-import { getUserById, formatDate, formatCurrency, plansConfig } from '@/lib/mock-data';
+import { getUserById, formatDate, formatCurrency, plansConfig, sampleUserAttributes } from '@/lib/mock-data';
+import { UserAttributes } from '@/components/attributes';
 import { StatusBadge, PlanBadge, Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
@@ -156,6 +157,75 @@ export default function UserDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Stripe Info (locked) */}
+          <Card>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-gray-500">🔒</span>
+              <h2 className="font-semibold text-gray-900">INFORMATIONS STRIPE</h2>
+              <span className="text-xs text-gray-500">(synchronisees automatiquement)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email</span>
+                <span className="text-gray-900 flex items-center gap-1">{user.email} <span className="text-gray-400">🔒</span></span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Plan</span>
+                <span className="text-gray-900 flex items-center gap-1 capitalize">{user.plan} <span className="text-gray-400">🔒</span></span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">MRR</span>
+                <span className="text-gray-900 flex items-center gap-1">{formatCurrency(user.mrr)} <span className="text-gray-400">🔒</span></span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Status</span>
+                <span className="text-gray-900 flex items-center gap-1 capitalize">{user.status} <span className="text-gray-400">🔒</span></span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Inscrit le</span>
+                <span className="text-gray-900 flex items-center gap-1">{formatDate(user.createdAt)} <span className="text-gray-400">🔒</span></span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-4 flex items-center gap-1">
+              <span>ℹ️</span>
+              Ces champs sont mis a jour automatiquement depuis Stripe.
+            </p>
+          </Card>
+
+          {/* Calculated Info */}
+          <Card>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-gray-500">📊</span>
+              <h2 className="font-semibold text-gray-900">INFORMATIONS CALCULEES</h2>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Health Score</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24">
+                    <HealthBar score={user.healthScore} showLabel={false} />
+                  </div>
+                  <span className="text-gray-900">{user.healthScore}/100 🔒</span>
+                </div>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">LTV</span>
+                <span className="text-gray-900">{formatCurrency(user.ltv)} 🔒</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Derniere activite</span>
+                <span className="text-gray-900">{formatDate(user.lastSeenAt)} 🔒</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Custom Attributes */}
+          <UserAttributes
+            userId={user.id}
+            initialValues={sampleUserAttributes[user.id] || {}}
+            onSave={(values) => console.log('Saving attributes:', values)}
+          />
 
           {/* Entitlements */}
           <Card>

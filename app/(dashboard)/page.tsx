@@ -2,95 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getStats, mrrHistory, formatCurrency, warningGroups, getTotalMrrAtRisk } from '@/lib/mock-data';
+import { getStats, mrrHistory, formatCurrency, warningGroups } from '@/lib/mock-data';
 import { Card } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/badge';
 import { CoachChips } from '@/components/coach';
-import { PeriodSelector, WarningsGrid, Period } from '@/components/dashboard';
-
-// KPI card with coach chips
-interface KpiCardProps {
-  label: string;
-  value: string | number;
-  change: number;
-  coachQuestions: Array<{ text: string; mockAnswer: string }>;
-}
-
-function KpiCard({ label, value, change, coachQuestions }: KpiCardProps) {
-  const isPositive = change >= 0;
-  const isNegativeGood = label.toLowerCase().includes('churn');
-  const displayPositive = isNegativeGood ? !isPositive : isPositive;
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-sm text-gray-500">{label}</p>
-      <div className="flex items-baseline gap-2 mt-1">
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <span
-          className={`text-sm font-medium ${
-            displayPositive ? 'text-green-600' : 'text-red-600'
-          }`}
-        >
-          {isPositive ? '+' : ''}{change}%
-          {displayPositive ? ' ▲' : ' ▼'}
-        </span>
-      </div>
-      <div className="mt-3">
-        <CoachChips questions={coachQuestions} className="gap-1" />
-      </div>
-    </div>
-  );
-}
+import { PeriodSelector, WarningsGrid, Period, KpiCard, KpiModal, KpiType } from '@/components/dashboard';
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>('30d');
+  const [activeKpiModal, setActiveKpiModal] = useState<KpiType | null>(null);
   const stats = getStats();
-  const totalMrrAtRisk = getTotalMrrAtRisk();
-
-  // Coach questions for each KPI
-  const mrrQuestions = [
-    {
-      text: 'Pourquoi +12% ?',
-      mockAnswer: `Votre MRR a augmente de 12% ce mois grace a :\n\n**Contributions positives :**\n- 3 nouveaux clients payants (+350€)\n- 2 upgrades Starter → Growth (+116€)\n- 1 reactivation churn (+49€)\n\n**Pertes :**\n- 1 churn (Julien Blanc, -149€)\n- 2 paiements echoues en attente\n\n**Net :** +366€ MRR ce mois`,
-    },
-    {
-      text: 'Prevision M+1 ?',
-      mockAnswer: `**Projection MRR pour le mois prochain :**\n\n📈 **Scenario optimiste :** 1 450€ (+17%)\n- Si les 3 trials convertissent\n- Si les paiements echoues sont recuperes\n\n📊 **Scenario realiste :** 1 320€ (+6%)\n- Conversion 2/3 trials\n- Recuperation 1 paiement\n\n📉 **Scenario pessimiste :** 1 180€ (-5%)\n- Aucune conversion trial\n- Perte des 2 paiements echoues`,
-    },
-  ];
-
-  const usersQuestions = [
-    {
-      text: 'Qui sont-ils ?',
-      mockAnswer: `**Repartition des ${stats.activeUsersCount} users actifs :**\n\n**Par plan :**\n- Starter : 4 users (49€/mois)\n- Growth : 2 users (99€/mois)\n- Team : 1 user (149€/mois)\n\n**Par anciennete :**\n- < 3 mois : 3 users\n- 3-12 mois : 3 users\n- > 12 mois : 1 user\n\n**Top users par MRR :**\n1. Startup Co (149€)\n2. Tech Sarl (99€)\n3. Agence Martin (99€)`,
-    },
-    {
-      text: 'Tendance ?',
-      mockAnswer: `**Tendance users actifs :**\n\n📈 **+8% ce mois** (vs -2% le mois dernier)\n\n**Evolution sur 6 mois :**\n- Jan : 5 users\n- Fev : 5 users\n- Mar : 6 users\n- Avr : 6 users\n- Mai : 7 users ← aujourd'hui\n\n**Projection :** 8-9 users fin du trimestre si tendance maintenue`,
-    },
-  ];
-
-  const churnQuestions = [
-    {
-      text: 'Pourquoi ?',
-      mockAnswer: `**Analyse du churn (${stats.churnRate}%) :**\n\n**Causes principales :**\n1. **Paiements echoues** (40%) — 2 users\n2. **Inactivite** (35%) — Pas de connexion 30j+\n3. **Prix** (15%) — Feedbacks "trop cher"\n4. **Fonctionnalites** (10%) — Manque feature cle\n\n**Cohorte la plus touchee :**\nUsers acquis avec promo LAUNCH50 (churn 18% vs 5% moyenne)`,
-    },
-    {
-      text: 'Qui est a risque ?',
-      mockAnswer: `**Users a risque de churn :**\n\n🔴 **Critique (churn imminent) :**\n1. marie@startup.fr — 3 paiements echoues\n2. julien.blanc@corp.io — Inactif 30 jours\n\n🟡 **A surveiller :**\n3. pierre.leroy@free.fr — Health score 45\n4. paul.moreau@acme.io — Trial expire J+2\n\n**MRR a risque total :** ${totalMrrAtRisk}€`,
-    },
-  ];
-
-  const conversionQuestions = [
-    {
-      text: 'Comment ameliorer ?',
-      mockAnswer: `**Ameliorer la conversion trial→paid (${stats.trialConversionRate}%) :**\n\n**Quick wins :**\n1. Email J+3 avec cas d'usage → +15% conversion\n2. Onboarding guide in-app → +20% engagement\n3. Call decouverte pour trials > 50€ → +35% conversion\n\n**Votre conversion vs marche :**\n- Votre taux : ${stats.trialConversionRate}%\n- Moyenne SaaS B2B : 15-25%\n- Top performers : 30-40%`,
-    },
-    {
-      text: 'Quels trials ?',
-      mockAnswer: `**Trials en cours (${stats.trialCount}) :**\n\n**Proches de convertir :**\n1. paul.moreau@acme.io\n   - Expire dans 2 jours\n   - Health score : 85 (excellent)\n   - Utilise 4/5 features cles\n\n**A relancer :**\n2. lea.martinez@company.com\n   - Expire dans 5 jours\n   - Health score : 60 (moyen)\n   - N'a pas configure les integrations\n\n**A risque :**\n3. startup@test.io\n   - Expire dans 3 jours\n   - Health score : 35 (faible)\n   - Derniere connexion il y a 8 jours`,
-    },
-  ];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -103,33 +24,52 @@ export default function DashboardPage() {
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
-      {/* KPI Cards with Coach Chips */}
+      {/* KPI Cards - Clickable */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <KpiCard
-          label="MRR"
+          type="mrr"
+          title="MRR"
           value={formatCurrency(stats.mrr)}
-          change={stats.mrrGrowth}
-          coachQuestions={mrrQuestions}
+          change={`+${stats.mrrGrowth}%`}
+          changeType="positive"
+          icon="💰"
+          onClick={() => setActiveKpiModal('mrr')}
         />
         <KpiCard
-          label="Users actifs"
-          value={stats.activeUsersCount}
-          change={stats.activeUsersGrowth}
-          coachQuestions={usersQuestions}
+          type="active_users"
+          title="Users actifs"
+          value={stats.activeUsersCount.toString()}
+          change={`+${stats.activeUsersGrowth}%`}
+          changeType="positive"
+          icon="👥"
+          onClick={() => setActiveKpiModal('active_users')}
         />
         <KpiCard
-          label="Churn rate"
+          type="churn"
+          title="Churn rate"
           value={`${stats.churnRate}%`}
-          change={0.5}
-          coachQuestions={churnQuestions}
+          change="+0.5%"
+          changeType="negative"
+          icon="📉"
+          onClick={() => setActiveKpiModal('churn')}
         />
         <KpiCard
-          label="Trial → Paid"
+          type="trial_conversion"
+          title="Trial → Paid"
           value={`${stats.trialConversionRate}%`}
-          change={-2}
-          coachQuestions={conversionQuestions}
+          change="-2%"
+          changeType="negative"
+          icon="🎯"
+          onClick={() => setActiveKpiModal('trial_conversion')}
         />
       </div>
+
+      {/* KPI Modal */}
+      <KpiModal
+        isOpen={activeKpiModal !== null}
+        onClose={() => setActiveKpiModal(null)}
+        kpiType={activeKpiModal || 'mrr'}
+      />
 
       {/* Warnings Grid */}
       <div className="mb-8">
