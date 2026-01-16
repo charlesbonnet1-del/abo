@@ -818,7 +818,6 @@ export function getStats() {
   const churnRate = totalPaidEver > 0 ? (churnedCount / totalPaidEver) * 100 : 0;
 
   const trialUsers = mockUsers.filter(u => u.status === 'trial');
-  const convertedFromTrial = activeUsers.filter(u => u.ltv > 0).length; // simplified
   const trialConversionRate = 23; // mocked
 
   return {
