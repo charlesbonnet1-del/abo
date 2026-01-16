@@ -1544,6 +1544,26 @@ export function getCampaignById(id: string): MockCampaign | undefined {
 // NEW: Warning Groups (Dashboard)
 // ============================================
 
+export interface AutomationDetail {
+  automationName: string;
+  userCount: number;
+  currentStep: string;
+  engagement?: string | null;
+}
+
+export interface AutomationCoverage {
+  coveredCount: number;
+  uncoveredCount: number;
+  details: AutomationDetail[];
+}
+
+export interface SuggestedAction {
+  type: 'activate_automation' | 'send_campaign' | 'view_templates';
+  label: string;
+  automationId?: string;
+  templateId?: string;
+}
+
 export interface WarningGroup {
   id: string;
   type: 'payment_failed' | 'trial_ending' | 'inactive' | 'card_expiring' |
@@ -1553,8 +1573,8 @@ export interface WarningGroup {
   userCount: number;
   mrrAtRisk?: number;
   description: string;
-  suggestedAction: string;
-  automationId?: string;
+  automationStatus: AutomationCoverage;
+  suggestedActions: SuggestedAction[];
   userIds: string[];
 }
 
@@ -1564,34 +1584,61 @@ export const warningGroups: WarningGroup[] = [
     type: 'payment_failed',
     severity: 'critical',
     title: 'Paiements echoues',
-    userCount: 2,
-    mrrAtRisk: 198,
-    description: '2 users avec paiement echoue depuis +3 jours',
-    suggestedAction: 'Relancer immediatement',
-    automationId: 'auto_4',
+    userCount: 12,
+    mrrAtRisk: 2400,
+    description: '2.4k€ MRR a risque',
+    automationStatus: {
+      coveredCount: 0,
+      uncoveredCount: 12,
+      details: [],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Activer "Relance paiement echoue"', automationId: 'auto_4' },
+      { type: 'send_campaign', label: 'Envoyer une campagne email manuelle' },
+      { type: 'view_templates', label: 'Voir les templates recommandes' },
+    ],
     userIds: ['usr_11', 'usr_14'],
   },
   {
     id: 'wg_2',
     type: 'trial_ending',
     severity: 'warning',
-    title: 'Trials expirent',
-    userCount: 3,
-    description: '3 trials expirent dans moins de 5 jours',
-    suggestedAction: 'Contacter pour conversion',
-    automationId: 'auto_3',
+    title: 'Trials expirent bientot',
+    userCount: 8,
+    description: 'dans < 3 jours',
+    automationStatus: {
+      coveredCount: 6,
+      uncoveredCount: 2,
+      details: [
+        { automationName: 'Trial Nurturing', userCount: 3, currentStep: 'Etape 2/4', engagement: null },
+        { automationName: 'Trial Ending Urgence', userCount: 2, currentStep: 'Email "Derniere chance" envoye', engagement: 'en attente reponse' },
+        { automationName: 'Trial Ending Urgence', userCount: 1, currentStep: 'Email "Offre -20%" envoye', engagement: 'a clique mais pas converti' },
+      ],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Ajouter les 2 restants a "Trial Nurturing"', automationId: 'auto_2' },
+    ],
     userIds: ['usr_7', 'usr_8', 'usr_9'],
   },
   {
     id: 'wg_3',
     type: 'inactive',
     severity: 'warning',
-    title: 'Inactifs > 14j',
-    userCount: 4,
-    mrrAtRisk: 247,
-    description: '4 users payants non connectes depuis 14+ jours',
-    suggestedAction: 'Lancer campagne reengagement',
-    automationId: 'auto_6',
+    title: 'Inactifs > 14 jours',
+    userCount: 23,
+    mrrAtRisk: 1800,
+    description: '1.8k€ MRR concerne',
+    automationStatus: {
+      coveredCount: 13,
+      uncoveredCount: 10,
+      details: [
+        { automationName: 'Reactivation inactifs', userCount: 8, currentStep: 'Email "On ne vous voit plus" envoye', engagement: '3 ont ouvert' },
+        { automationName: 'Reactivation inactifs', userCount: 5, currentStep: 'Etape 2/3', engagement: null },
+      ],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Ajouter les 10 restants a "Reactivation"', automationId: 'auto_6' },
+    ],
     userIds: ['usr_12', 'usr_13', 'usr_14', 'usr_15'],
   },
   {
@@ -1599,31 +1646,54 @@ export const warningGroups: WarningGroup[] = [
     type: 'card_expiring',
     severity: 'info',
     title: 'CB expirent bientot',
-    userCount: 3,
-    mrrAtRisk: 178,
-    description: '3 cartes bancaires expirent dans < 30 jours',
-    suggestedAction: 'Envoyer rappel mise a jour',
+    userCount: 15,
+    description: 'dans < 30 jours',
+    automationStatus: {
+      coveredCount: 15,
+      uncoveredCount: 0,
+      details: [
+        { automationName: 'Rappel CB expiree', userCount: 15, currentStep: 'Email de rappel programme J-7', engagement: null },
+      ],
+    },
+    suggestedActions: [],
     userIds: ['usr_10', 'usr_11', 'usr_16'],
   },
   {
     id: 'wg_5',
     type: 'anniversary',
     severity: 'positive',
-    title: 'Anniversaires',
-    userCount: 2,
-    description: '2 users fetent 1 an d\'abonnement ce mois',
-    suggestedAction: 'Envoyer felicitations',
+    title: 'Anniversaires a celebrer',
+    userCount: 5,
+    description: '1 an d\'abonnement',
+    automationStatus: {
+      coveredCount: 5,
+      uncoveredCount: 0,
+      details: [
+        { automationName: 'Anniversaire abonnement', userCount: 5, currentStep: 'Email de felicitations programme', engagement: null },
+      ],
+    },
+    suggestedActions: [],
     userIds: ['usr_10', 'usr_16'],
   },
   {
     id: 'wg_6',
     type: 'low_health',
     severity: 'warning',
-    title: 'Health score < 40',
-    userCount: 3,
-    mrrAtRisk: 296,
-    description: '3 users avec score de sante critique',
-    suggestedAction: 'Analyser et contacter',
+    title: 'Health score < 30',
+    userCount: 18,
+    mrrAtRisk: 3200,
+    description: 'Risque de churn eleve',
+    automationStatus: {
+      coveredCount: 7,
+      uncoveredCount: 11,
+      details: [
+        { automationName: 'Churn Prevention', userCount: 7, currentStep: 'Email personnalise envoye', engagement: '2 ont repondu' },
+      ],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Ajouter les 11 restants a "Churn Prevention"', automationId: 'auto_8' },
+      { type: 'send_campaign', label: 'Envoyer une offre de retention' },
+    ],
     userIds: ['usr_11', 'usr_12', 'usr_14'],
   },
   {
@@ -1631,10 +1701,18 @@ export const warningGroups: WarningGroup[] = [
     type: 'limit_approaching',
     severity: 'info',
     title: 'Limite atteinte',
-    userCount: 2,
-    description: '2 users ont atteint 90%+ de leur limite',
-    suggestedAction: 'Proposer upgrade',
-    automationId: 'auto_7',
+    userCount: 8,
+    description: '8 users ont atteint 90%+ de leur limite',
+    automationStatus: {
+      coveredCount: 5,
+      uncoveredCount: 3,
+      details: [
+        { automationName: 'Upgrade Nudge', userCount: 5, currentStep: 'Email "Vous approchez de la limite" envoye', engagement: '2 ont clique sur upgrade' },
+      ],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Ajouter les 3 restants a "Upgrade Nudge"', automationId: 'auto_7' },
+    ],
     userIds: ['usr_1', 'usr_5'],
   },
   {
@@ -1642,10 +1720,18 @@ export const warningGroups: WarningGroup[] = [
     type: 'downgrade_risk',
     severity: 'warning',
     title: 'Risque downgrade',
-    userCount: 1,
-    mrrAtRisk: 149,
-    description: '1 user Team sous-utilise son plan',
-    suggestedAction: 'Proposer formation features',
+    userCount: 4,
+    mrrAtRisk: 396,
+    description: 'Users sous-utilisent leur plan',
+    automationStatus: {
+      coveredCount: 0,
+      uncoveredCount: 4,
+      details: [],
+    },
+    suggestedActions: [
+      { type: 'activate_automation', label: 'Activer "Formation features"', automationId: 'auto_9' },
+      { type: 'send_campaign', label: 'Proposer un call de decouverte' },
+    ],
     userIds: ['usr_16'],
   },
 ];
