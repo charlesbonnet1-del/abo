@@ -2389,3 +2389,728 @@ export const sampleUserAttributes: Record<string, UserAttributeValues> = {
     demo_date: '2024-12-20',
   },
 };
+
+// ============================================
+// WINS DATA
+// ============================================
+
+export interface WinsData {
+  period: string;
+  mrrSaved: { amount: number; churnsAvoided: number; details: string };
+  expansion: { amount: number; upsellCount: number; source: string };
+  paymentsRecovered: { recovered: number; total: number; successRate: number };
+  trialsConverted: { count: number; vsWithoutAutomations: number; mrrGenerated: number };
+  timeSaved: { hours: number; actionsAutomated: number };
+}
+
+export const mockWins: WinsData = {
+  period: 'Ce mois',
+  mrrSaved: { amount: 2400, churnsAvoided: 12, details: 'grace aux relances automatiques' },
+  expansion: { amount: 890, upsellCount: 8, source: 'via automations et popups' },
+  paymentsRecovered: { recovered: 15, total: 18, successRate: 83 },
+  trialsConverted: { count: 28, vsWithoutAutomations: 5, mrrGenerated: 1200 },
+  timeSaved: { hours: 12, actionsAutomated: 156 },
+};
+
+export interface WinDetail {
+  id: string;
+  type: 'churn_avoided' | 'upsell' | 'payment_recovered' | 'trial_converted';
+  userId: string;
+  userName: string;
+  userEmail: string;
+  amount: number;
+  date: string;
+  details: string;
+}
+
+export const mockWinDetails: WinDetail[] = [
+  { id: 'win_1', type: 'churn_avoided', userId: 'usr_1', userName: 'Alice Martin', userEmail: 'alice@acme.com', amount: 199, date: daysAgo(2), details: 'Email relance apres inactivite' },
+  { id: 'win_2', type: 'churn_avoided', userId: 'usr_2', userName: 'Bob Dupont', userEmail: 'bob@tech.io', amount: 299, date: daysAgo(3), details: 'Offre -30% apres tentative annulation' },
+  { id: 'win_3', type: 'upsell', userId: 'usr_3', userName: 'Claire Petit', userEmail: 'claire@startup.fr', amount: 100, date: daysAgo(1), details: 'Upgrade Growth vers Team via popup' },
+  { id: 'win_4', type: 'payment_recovered', userId: 'usr_4', userName: 'David Laurent', userEmail: 'david@agency.com', amount: 79, date: daysAgo(4), details: 'Paiement recupere apres 2e relance' },
+  { id: 'win_5', type: 'trial_converted', userId: 'usr_5', userName: 'Emma Bernard', userEmail: 'emma@freelance.io', amount: 49, date: daysAgo(1), details: 'Conversion J12 apres email personnalise' },
+  { id: 'win_6', type: 'churn_avoided', userId: 'usr_6', userName: 'Felix Moreau', userEmail: 'felix@consulting.fr', amount: 399, date: daysAgo(5), details: 'Suspension 2 mois au lieu annulation' },
+  { id: 'win_7', type: 'upsell', userId: 'usr_7', userName: 'Grace Liu', userEmail: 'grace@bigcorp.com', amount: 200, date: daysAgo(2), details: 'Upgrade limite atteinte' },
+  { id: 'win_8', type: 'payment_recovered', userId: 'usr_8', userName: 'Hugo Martin', userEmail: 'hugo@dev.io', amount: 29, date: daysAgo(6), details: 'Carte expiree mise a jour' },
+];
+
+export const winsHistory: { month: string; mrrSaved: number; expansion: number; recovered: number }[] = [
+  { month: 'Jul', mrrSaved: 1800, expansion: 650, recovered: 420 },
+  { month: 'Aou', mrrSaved: 2100, expansion: 720, recovered: 380 },
+  { month: 'Sep', mrrSaved: 1950, expansion: 810, recovered: 510 },
+  { month: 'Oct', mrrSaved: 2300, expansion: 780, recovered: 440 },
+  { month: 'Nov', mrrSaved: 2200, expansion: 850, recovered: 490 },
+  { month: 'Dec', mrrSaved: 2400, expansion: 890, recovered: 520 },
+];
+
+// ============================================
+// ANALYTICS DATA
+// ============================================
+
+export interface WaterfallData {
+  category: string;
+  value: number;
+  type: 'start' | 'positive' | 'negative' | 'end';
+}
+
+export const mrrWaterfall: WaterfallData[] = [
+  { category: 'MRR Debut', value: 11200, type: 'start' },
+  { category: 'Nouveaux', value: 1800, type: 'positive' },
+  { category: 'Expansion', value: 890, type: 'positive' },
+  { category: 'Contraction', value: -320, type: 'negative' },
+  { category: 'Churn', value: -1170, type: 'negative' },
+  { category: 'MRR Fin', value: 12400, type: 'end' },
+];
+
+export interface ArrProjection {
+  month: string;
+  pessimistic: number;
+  current: number;
+  optimistic: number;
+}
+
+export const arrProjection: ArrProjection[] = [
+  { month: 'Jan 25', pessimistic: 145000, current: 148800, optimistic: 152000 },
+  { month: 'Avr 25', pessimistic: 158000, current: 168000, optimistic: 178000 },
+  { month: 'Jul 25', pessimistic: 172000, current: 192000, optimistic: 212000 },
+  { month: 'Oct 25', pessimistic: 188000, current: 220000, optimistic: 252000 },
+  { month: 'Jan 26', pessimistic: 205000, current: 252000, optimistic: 300000 },
+  { month: 'Avr 26', pessimistic: 225000, current: 290000, optimistic: 360000 },
+  { month: 'Jul 26', pessimistic: 248000, current: 335000, optimistic: 430000 },
+  { month: 'Oct 26', pessimistic: 275000, current: 390000, optimistic: 520000 },
+  { month: 'Jan 27', pessimistic: 305000, current: 455000, optimistic: 630000 },
+  { month: 'Avr 27', pessimistic: 340000, current: 535000, optimistic: 770000 },
+  { month: 'Jul 27', pessimistic: 380000, current: 630000, optimistic: 950000 },
+  { month: 'Oct 27', pessimistic: 425000, current: 750000, optimistic: 1200000 },
+];
+
+export interface NrrData {
+  current: number;
+  trend: number;
+  history: { month: string; value: number }[];
+  benchmark: { low: number; medium: number; high: number };
+}
+
+export const nrrData: NrrData = {
+  current: 108,
+  trend: 3,
+  history: [
+    { month: 'Jul', value: 102 },
+    { month: 'Aou', value: 104 },
+    { month: 'Sep', value: 103 },
+    { month: 'Oct', value: 105 },
+    { month: 'Nov', value: 106 },
+    { month: 'Dec', value: 108 },
+  ],
+  benchmark: { low: 90, medium: 100, high: 120 },
+};
+
+export interface ChurnByReason {
+  reason: string;
+  count: number;
+  mrr: number;
+  percent: number;
+}
+
+export const churnByReason: ChurnByReason[] = [
+  { reason: 'Paiement echoue', count: 8, mrr: 520, percent: 28 },
+  { reason: 'Trop cher', count: 6, mrr: 380, percent: 21 },
+  { reason: 'N\'utilise pas assez', count: 5, mrr: 290, percent: 17 },
+  { reason: 'Concurrent', count: 4, mrr: 320, percent: 14 },
+  { reason: 'Feature manquante', count: 3, mrr: 180, percent: 10 },
+  { reason: 'Probleme technique', count: 2, mrr: 90, percent: 7 },
+  { reason: 'Autre', count: 1, mrr: 40, percent: 3 },
+];
+
+export interface ChurnByPlanDetailed {
+  plan: string;
+  churnRate: number;
+  trend: number;
+  mrrLost: number;
+  userCount: number;
+}
+
+export const churnByPlanDetailed: ChurnByPlanDetailed[] = [
+  { plan: 'Free', churnRate: 12.5, trend: -2, mrrLost: 0, userCount: 45 },
+  { plan: 'Starter', churnRate: 8.2, trend: -1.5, mrrLost: 280, userCount: 89 },
+  { plan: 'Growth', churnRate: 4.8, trend: 0.3, mrrLost: 420, userCount: 45 },
+  { plan: 'Team', churnRate: 2.1, trend: -0.8, mrrLost: 180, userCount: 24 },
+  { plan: 'Scale', churnRate: 0.8, trend: -0.2, mrrLost: 120, userCount: 12 },
+];
+
+export interface ChurnByTenure {
+  tenure: string;
+  churnRate: number;
+  userCount: number;
+  avgMrr: number;
+}
+
+export const churnByTenure: ChurnByTenure[] = [
+  { tenure: '< 1 mois', churnRate: 18.5, userCount: 32, avgMrr: 45 },
+  { tenure: '1-3 mois', churnRate: 9.2, userCount: 48, avgMrr: 68 },
+  { tenure: '3-6 mois', churnRate: 5.4, userCount: 56, avgMrr: 89 },
+  { tenure: '6-12 mois', churnRate: 3.1, userCount: 42, avgMrr: 112 },
+  { tenure: '> 12 mois', churnRate: 1.2, userCount: 37, avgMrr: 156 },
+];
+
+export interface ChurnPrediction {
+  userId: string;
+  userName: string;
+  email: string;
+  plan: string;
+  mrr: number;
+  riskScore: number;
+  mainReason: string;
+  daysInactive: number;
+}
+
+export const churnPredictions: ChurnPrediction[] = [
+  { userId: 'usr_12', userName: 'Pierre Leroy', email: 'pierre@studio.fr', plan: 'Growth', mrr: 79, riskScore: 92, mainReason: 'Inactif depuis 21 jours', daysInactive: 21 },
+  { userId: 'usr_15', userName: 'Marie Blanc', email: 'marie@agency.io', plan: 'Team', mrr: 149, riskScore: 85, mainReason: 'Carte expire dans 5 jours', daysInactive: 8 },
+  { userId: 'usr_18', userName: 'Lucas Martin', email: 'lucas@dev.com', plan: 'Starter', mrr: 29, riskScore: 78, mainReason: 'Usage en forte baisse', daysInactive: 14 },
+  { userId: 'usr_21', userName: 'Sophie Dupont', email: 'sophie@consulting.fr', plan: 'Growth', mrr: 79, riskScore: 72, mainReason: 'A visite page annulation', daysInactive: 3 },
+  { userId: 'usr_24', userName: 'Thomas Petit', email: 'thomas@startup.io', plan: 'Starter', mrr: 29, riskScore: 68, mainReason: 'Support non resolu', daysInactive: 12 },
+];
+
+export interface SavedVsLost {
+  month: string;
+  saved: number;
+  lost: number;
+  saveRate: number;
+}
+
+export const savedVsLost: SavedVsLost[] = [
+  { month: 'Jul', saved: 8, lost: 12, saveRate: 40 },
+  { month: 'Aou', saved: 10, lost: 11, saveRate: 48 },
+  { month: 'Sep', saved: 9, lost: 10, saveRate: 47 },
+  { month: 'Oct', saved: 11, lost: 9, saveRate: 55 },
+  { month: 'Nov', saved: 12, lost: 8, saveRate: 60 },
+  { month: 'Dec', saved: 14, lost: 7, saveRate: 67 },
+];
+
+export interface EngagementMetrics {
+  dau: number;
+  dauTrend: number;
+  wau: number;
+  wauTrend: number;
+  mau: number;
+  mauTrend: number;
+  stickiness: number;
+  stickinessTrend: number;
+}
+
+export const engagementMetrics: EngagementMetrics = {
+  dau: 145,
+  dauTrend: 8,
+  wau: 412,
+  wauTrend: 5,
+  mau: 890,
+  mauTrend: 12,
+  stickiness: 16.3,
+  stickinessTrend: 1.2,
+};
+
+export interface FeatureAdoption {
+  feature: string;
+  adoptionRate: number;
+  trend: number;
+  avgUsagePerUser: number;
+}
+
+export const featureAdoption: FeatureAdoption[] = [
+  { feature: 'Dashboard', adoptionRate: 95, trend: 2, avgUsagePerUser: 12.5 },
+  { feature: 'Segments', adoptionRate: 78, trend: 5, avgUsagePerUser: 4.2 },
+  { feature: 'Automations', adoptionRate: 62, trend: 8, avgUsagePerUser: 2.8 },
+  { feature: 'Emails', adoptionRate: 54, trend: 3, avgUsagePerUser: 6.1 },
+  { feature: 'Cohortes', adoptionRate: 45, trend: 12, avgUsagePerUser: 1.9 },
+  { feature: 'API', adoptionRate: 28, trend: 4, avgUsagePerUser: 45.2 },
+  { feature: 'Webhooks', adoptionRate: 18, trend: 6, avgUsagePerUser: 8.4 },
+];
+
+export interface TimeToValue {
+  action: string;
+  medianDays: number;
+  percentCompleted: number;
+}
+
+export const timeToValue: TimeToValue[] = [
+  { action: 'Premier login', medianDays: 0, percentCompleted: 100 },
+  { action: 'Integration Stripe', medianDays: 1, percentCompleted: 85 },
+  { action: 'Premier segment cree', medianDays: 2, percentCompleted: 72 },
+  { action: 'Premiere automation', medianDays: 5, percentCompleted: 58 },
+  { action: 'Premier email envoye', medianDays: 7, percentCompleted: 48 },
+  { action: '10 users importes', medianDays: 3, percentCompleted: 65 },
+];
+
+export interface UserSegmentation {
+  segment: string;
+  percent: number;
+  count: number;
+  avgLtv: number;
+  avgMrr: number;
+  description: string;
+}
+
+export const userSegmentation: UserSegmentation[] = [
+  { segment: 'Power Users', percent: 12, count: 107, avgLtv: 2850, avgMrr: 156, description: 'Top 10% les plus actifs' },
+  { segment: 'Regular Users', percent: 58, count: 516, avgLtv: 890, avgMrr: 72, description: 'Usage normal' },
+  { segment: 'Casual Users', percent: 30, count: 267, avgLtv: 320, avgMrr: 38, description: 'Usage occasionnel' },
+];
+
+export interface ConversionFunnelDetailed {
+  step: string;
+  count: number;
+  rate: number;
+  dropoff: number;
+}
+
+export const conversionFunnelDetailed: ConversionFunnelDetailed[] = [
+  { step: 'Inscription', count: 1250, rate: 100, dropoff: 0 },
+  { step: 'Email verifie', count: 1100, rate: 88, dropoff: 12 },
+  { step: 'Onboarding complete', count: 820, rate: 65.6, dropoff: 25.5 },
+  { step: 'Integration Stripe', count: 580, rate: 46.4, dropoff: 29.3 },
+  { step: 'Premier segment', count: 420, rate: 33.6, dropoff: 27.6 },
+  { step: 'Trial actif', count: 380, rate: 30.4, dropoff: 9.5 },
+  { step: 'Conversion Paid', count: 285, rate: 22.8, dropoff: 25 },
+];
+
+export interface ConversionBySourceDetailed {
+  source: string;
+  trials: number;
+  converted: number;
+  rate: number;
+  avgMrr: number;
+}
+
+export const conversionBySourceDetailed: ConversionBySourceDetailed[] = [
+  { source: 'Organic (SEO)', trials: 450, converted: 112, rate: 24.9, avgMrr: 68 },
+  { source: 'ProductHunt', trials: 320, converted: 89, rate: 27.8, avgMrr: 72 },
+  { source: 'Referral', trials: 180, converted: 62, rate: 34.4, avgMrr: 95 },
+  { source: 'Paid Ads', trials: 200, converted: 38, rate: 19.0, avgMrr: 52 },
+  { source: 'Social', trials: 100, converted: 18, rate: 18.0, avgMrr: 48 },
+];
+
+export interface TimeToConvert {
+  day: string;
+  percent: number;
+  cumulative: number;
+}
+
+export const timeToConvert: TimeToConvert[] = [
+  { day: 'J1', percent: 8, cumulative: 8 },
+  { day: 'J3', percent: 12, cumulative: 20 },
+  { day: 'J7', percent: 18, cumulative: 38 },
+  { day: 'J10', percent: 22, cumulative: 60 },
+  { day: 'J14', percent: 25, cumulative: 85 },
+  { day: 'J14+', percent: 15, cumulative: 100 },
+];
+
+export interface EmailPerformance {
+  metric: string;
+  value: number;
+  trend: number;
+}
+
+export const emailPerformanceGlobal: EmailPerformance[] = [
+  { metric: 'Envoyes', value: 12450, trend: 8 },
+  { metric: 'Delivres', value: 12180, trend: 7 },
+  { metric: 'Ouverts', value: 4872, trend: 12 },
+  { metric: 'Cliques', value: 1218, trend: 15 },
+  { metric: 'Convertis', value: 182, trend: 22 },
+];
+
+export interface CampaignPerformance {
+  id: string;
+  name: string;
+  type: 'campaign' | 'automation';
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  converted: number;
+  revenue: number;
+}
+
+export const campaignPerformances: CampaignPerformance[] = [
+  { id: 'camp_1', name: 'Bienvenue', type: 'automation', sent: 2450, delivered: 2400, opened: 1680, clicked: 720, converted: 180, revenue: 8900 },
+  { id: 'camp_2', name: 'Trial J7', type: 'automation', sent: 1820, delivered: 1790, opened: 895, clicked: 358, converted: 89, revenue: 4200 },
+  { id: 'camp_3', name: 'Trial expire', type: 'automation', sent: 980, delivered: 965, opened: 580, clicked: 290, converted: 58, revenue: 2750 },
+  { id: 'camp_4', name: 'Black Friday', type: 'campaign', sent: 4500, delivered: 4420, opened: 1768, clicked: 442, converted: 66, revenue: 5280 },
+  { id: 'camp_5', name: 'Reengagement', type: 'automation', sent: 1200, delivered: 1180, opened: 472, clicked: 118, converted: 24, revenue: 1150 },
+];
+
+export interface PopupPerformance {
+  id: string;
+  name: string;
+  type: 'upsell' | 'promo' | 'survey' | 'feedback' | 'announcement' | 'exit_intent' | 'onboarding';
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  conversionRate: number;
+}
+
+export const popupPerformances: PopupPerformance[] = [
+  { id: 'pop_1', name: 'Upgrade Growth', type: 'upsell', impressions: 2450, clicks: 490, conversions: 98, revenue: 4900, conversionRate: 4.0 },
+  { id: 'pop_2', name: 'Black Friday -30%', type: 'promo', impressions: 1820, clicks: 546, conversions: 82, revenue: 3280, conversionRate: 4.5 },
+  { id: 'pop_3', name: 'NPS Survey', type: 'survey', impressions: 980, clicks: 294, conversions: 147, revenue: 0, conversionRate: 15.0 },
+  { id: 'pop_4', name: 'Exit offer', type: 'exit_intent', impressions: 450, clicks: 135, conversions: 45, revenue: 1800, conversionRate: 10.0 },
+  { id: 'pop_5', name: 'Nouvelle feature', type: 'announcement', impressions: 3200, clicks: 640, conversions: 0, revenue: 0, conversionRate: 20.0 },
+];
+
+export interface ABTestResult {
+  id: string;
+  name: string;
+  type: 'email' | 'popup';
+  status: 'running' | 'completed' | 'stopped';
+  variants: {
+    name: string;
+    impressions: number;
+    conversions: number;
+    rate: number;
+    isWinner: boolean;
+  }[];
+  confidence: number;
+  startDate: string;
+  endDate?: string;
+}
+
+export const abTestResults: ABTestResult[] = [
+  {
+    id: 'ab_1',
+    name: 'CTA Trial Email',
+    type: 'email',
+    status: 'completed',
+    variants: [
+      { name: 'Commencer maintenant', impressions: 1200, conversions: 96, rate: 8.0, isWinner: false },
+      { name: 'Essayer gratuitement', impressions: 1180, conversions: 142, rate: 12.0, isWinner: true },
+    ],
+    confidence: 95,
+    startDate: daysAgo(21),
+    endDate: daysAgo(7),
+  },
+  {
+    id: 'ab_2',
+    name: 'Popup Timing',
+    type: 'popup',
+    status: 'running',
+    variants: [
+      { name: 'Immediat', impressions: 850, conversions: 34, rate: 4.0, isWinner: false },
+      { name: 'Apres 30s', impressions: 820, conversions: 49, rate: 6.0, isWinner: true },
+    ],
+    confidence: 82,
+    startDate: daysAgo(5),
+  },
+  {
+    id: 'ab_3',
+    name: 'Offre retention',
+    type: 'popup',
+    status: 'completed',
+    variants: [
+      { name: '-30% 3 mois', impressions: 420, conversions: 84, rate: 20.0, isWinner: true },
+      { name: '-50% 1 mois', impressions: 410, conversions: 62, rate: 15.1, isWinner: false },
+    ],
+    confidence: 92,
+    startDate: daysAgo(30),
+    endDate: daysAgo(10),
+  },
+];
+
+// ============================================
+// POPUPS DATA
+// ============================================
+
+export type PopupType = 'upsell' | 'promo' | 'survey' | 'feedback' | 'announcement' | 'exit_intent' | 'onboarding';
+export type PopupStatus = 'active' | 'draft' | 'paused' | 'archived' | 'ab_test';
+export type PopupPosition = 'center' | 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'bottom-bar' | 'top-bar';
+export type PopupSize = 'small' | 'medium' | 'large';
+export type PopupTriggerType = 'page_load' | 'delay' | 'scroll' | 'exit_intent' | 'click' | 'custom';
+
+export interface PopupDesign {
+  position: PopupPosition;
+  size: PopupSize;
+  title: string;
+  description: string;
+  image?: string;
+  primaryButton: { text: string; url?: string; color: string };
+  secondaryButton?: { text: string; url?: string };
+  backgroundColor: string;
+  borderRadius: number;
+  overlay: boolean;
+  overlayColor: string;
+}
+
+export interface PopupTargeting {
+  segmentId?: string;
+  segmentName?: string;
+  excludeConverted: boolean;
+  excludeClosed: boolean;
+  excludeSeen: boolean;
+}
+
+export interface PopupTrigger {
+  type: PopupTriggerType;
+  delay?: number;
+  scrollPercent?: number;
+  pageUrl?: string;
+  customEvent?: string;
+}
+
+export interface PopupFrequency {
+  max: number;
+  per: 'session' | 'day' | 'week' | 'month' | 'total';
+}
+
+export interface PopupABTest {
+  enabled: boolean;
+  variants: { id: string; name: string; changes: string; trafficPercent: number }[];
+  stopCondition: { type: 'confidence' | 'impressions' | 'days' | 'manual'; value?: number };
+}
+
+export interface Popup {
+  id: string;
+  name: string;
+  type: PopupType;
+  status: PopupStatus;
+  design: PopupDesign;
+  targeting: PopupTargeting;
+  trigger: PopupTrigger;
+  frequency: PopupFrequency;
+  abTest?: PopupABTest;
+  stats: { impressions: number; clicks: number; conversions: number; revenue: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const mockPopups: Popup[] = [
+  {
+    id: 'popup_1',
+    name: 'Upgrade Growth',
+    type: 'upsell',
+    status: 'active',
+    design: {
+      position: 'center',
+      size: 'medium',
+      title: 'Passez a Growth',
+      description: 'Debloquez les automations avancees et le support prioritaire.',
+      image: 'https://placehold.co/400x200/4f46e5/ffffff?text=Growth',
+      primaryButton: { text: 'Upgrader maintenant', url: '/upgrade', color: '#4f46e5' },
+      secondaryButton: { text: 'Plus tard' },
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      overlay: true,
+      overlayColor: 'rgba(0,0,0,0.5)',
+    },
+    targeting: { segmentId: 'seg_9', segmentName: 'Hot leads freemium', excludeConverted: true, excludeClosed: true, excludeSeen: false },
+    trigger: { type: 'delay', delay: 30 },
+    frequency: { max: 1, per: 'week' },
+    stats: { impressions: 2450, clicks: 490, conversions: 98, revenue: 4900 },
+    createdAt: daysAgo(60),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'popup_2',
+    name: 'Black Friday -30%',
+    type: 'promo',
+    status: 'paused',
+    design: {
+      position: 'center',
+      size: 'large',
+      title: 'Black Friday : -30% sur tous les plans',
+      description: 'Offre valable jusqu\'au 30 novembre minuit. Code: BF30',
+      image: 'https://placehold.co/500x250/000000/ffffff?text=BLACK+FRIDAY',
+      primaryButton: { text: 'Profiter de l\'offre', url: '/pricing?promo=BF30', color: '#000000' },
+      secondaryButton: { text: 'Non merci' },
+      backgroundColor: '#fef3c7',
+      borderRadius: 12,
+      overlay: true,
+      overlayColor: 'rgba(0,0,0,0.6)',
+    },
+    targeting: { excludeConverted: false, excludeClosed: true, excludeSeen: false },
+    trigger: { type: 'page_load' },
+    frequency: { max: 1, per: 'day' },
+    stats: { impressions: 1820, clicks: 546, conversions: 82, revenue: 3280 },
+    createdAt: daysAgo(45),
+    updatedAt: daysAgo(30),
+  },
+  {
+    id: 'popup_3',
+    name: 'NPS Survey',
+    type: 'survey',
+    status: 'active',
+    design: {
+      position: 'bottom-right',
+      size: 'small',
+      title: 'Votre avis compte',
+      description: 'Sur une echelle de 0 a 10, recommanderiez-vous Abo ?',
+      primaryButton: { text: 'Envoyer', color: '#10b981' },
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      overlay: false,
+      overlayColor: 'rgba(0,0,0,0)',
+    },
+    targeting: { segmentId: 'seg_10', segmentName: 'Power users', excludeConverted: false, excludeClosed: true, excludeSeen: true },
+    trigger: { type: 'delay', delay: 60 },
+    frequency: { max: 1, per: 'month' },
+    stats: { impressions: 980, clicks: 294, conversions: 147, revenue: 0 },
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'popup_4',
+    name: 'Exit Intent Offer',
+    type: 'exit_intent',
+    status: 'active',
+    design: {
+      position: 'center',
+      size: 'medium',
+      title: 'Attendez !',
+      description: 'Beneficiez de -20% sur votre premier mois si vous vous inscrivez maintenant.',
+      primaryButton: { text: 'Obtenir -20%', url: '/signup?promo=EXIT20', color: '#ef4444' },
+      secondaryButton: { text: 'Non merci' },
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      overlay: true,
+      overlayColor: 'rgba(0,0,0,0.7)',
+    },
+    targeting: { excludeConverted: true, excludeClosed: true, excludeSeen: false },
+    trigger: { type: 'exit_intent' },
+    frequency: { max: 1, per: 'session' },
+    stats: { impressions: 450, clicks: 135, conversions: 45, revenue: 1800 },
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'popup_5',
+    name: 'Feature Announcement',
+    type: 'announcement',
+    status: 'draft',
+    design: {
+      position: 'top-bar',
+      size: 'small',
+      title: 'Nouveau : Email Builder Drag & Drop',
+      description: 'Creez de beaux emails sans code.',
+      primaryButton: { text: 'Decouvrir', url: '/emails/editor', color: '#6366f1' },
+      backgroundColor: '#eef2ff',
+      borderRadius: 0,
+      overlay: false,
+      overlayColor: 'rgba(0,0,0,0)',
+    },
+    targeting: { excludeConverted: false, excludeClosed: true, excludeSeen: true },
+    trigger: { type: 'page_load' },
+    frequency: { max: 1, per: 'total' },
+    stats: { impressions: 0, clicks: 0, conversions: 0, revenue: 0 },
+    createdAt: daysAgo(1),
+    updatedAt: daysAgo(1),
+  },
+];
+
+// ============================================
+// CANCEL FLOW DATA
+// ============================================
+
+export interface CancelFlowStats {
+  attempts: number;
+  saved: number;
+  suspended: number;
+  downgraded: number;
+  lost: number;
+  mrrSaved: number;
+  mrrLost: number;
+  saveRate: number;
+}
+
+export const cancelFlowStats: CancelFlowStats = {
+  attempts: 89,
+  saved: 34,
+  suspended: 12,
+  downgraded: 8,
+  lost: 35,
+  mrrSaved: 4250,
+  mrrLost: 2180,
+  saveRate: 61,
+};
+
+export interface CancelReason {
+  id: string;
+  label: string;
+  offerId: string;
+  offerLabel: string;
+  usageCount: number;
+  saveRate: number;
+}
+
+export const cancelReasons: CancelReason[] = [
+  { id: 'reason_1', label: 'C\'est trop cher', offerId: 'offer_1', offerLabel: 'Reduction -30%', usageCount: 28, saveRate: 45 },
+  { id: 'reason_2', label: 'Je n\'utilise pas assez', offerId: 'offer_2', offerLabel: 'Suspension 1-3 mois', usageCount: 22, saveRate: 55 },
+  { id: 'reason_3', label: 'Il manque une feature', offerId: 'offer_3', offerLabel: 'Feedback + Roadmap', usageCount: 15, saveRate: 35 },
+  { id: 'reason_4', label: 'Je pars chez un concurrent', offerId: 'offer_4', offerLabel: 'Offre speciale', usageCount: 12, saveRate: 28 },
+  { id: 'reason_5', label: 'Probleme technique', offerId: 'offer_5', offerLabel: 'Support prioritaire', usageCount: 8, saveRate: 72 },
+  { id: 'reason_6', label: 'Autre', offerId: 'offer_6', offerLabel: 'Formulaire libre', usageCount: 4, saveRate: 20 },
+];
+
+export type RetentionOfferType = 'discount' | 'suspension' | 'downgrade' | 'extension' | 'call';
+
+export interface RetentionOffer {
+  id: string;
+  type: RetentionOfferType;
+  name: string;
+  description: string;
+  config: Record<string, number | string | boolean>;
+  conditions: string[];
+  stats: { shown: number; accepted: number; acceptRate: number; mrrSaved: number };
+  isActive: boolean;
+}
+
+export const retentionOffers: RetentionOffer[] = [
+  {
+    id: 'offer_1',
+    type: 'discount',
+    name: 'Reduction -30%',
+    description: '30% de reduction pendant 3 mois',
+    config: { percent: 30, months: 3 },
+    conditions: ['Anciennete > 1 mois', 'Max 1 fois par user'],
+    stats: { shown: 28, accepted: 12, acceptRate: 43, mrrSaved: 1450 },
+    isActive: true,
+  },
+  {
+    id: 'offer_2',
+    type: 'suspension',
+    name: 'Suspension temporaire',
+    description: 'Mettez votre compte en pause',
+    config: { minMonths: 1, maxMonths: 3 },
+    conditions: ['Abonnement actif'],
+    stats: { shown: 22, accepted: 12, acceptRate: 55, mrrSaved: 980 },
+    isActive: true,
+  },
+  {
+    id: 'offer_3',
+    type: 'downgrade',
+    name: 'Downgrade',
+    description: 'Passez a un plan inferieur',
+    config: {},
+    conditions: ['Plan > Starter'],
+    stats: { shown: 15, accepted: 8, acceptRate: 53, mrrSaved: 620 },
+    isActive: true,
+  },
+  {
+    id: 'offer_4',
+    type: 'extension',
+    name: '1 mois offert',
+    description: 'Un mois gratuit pour continuer',
+    config: { months: 1 },
+    conditions: ['Anciennete > 3 mois', 'MRR > 50'],
+    stats: { shown: 12, accepted: 4, acceptRate: 33, mrrSaved: 380 },
+    isActive: true,
+  },
+  {
+    id: 'offer_5',
+    type: 'call',
+    name: 'Appel support',
+    description: 'Parlez avec notre equipe',
+    config: { calendlyUrl: 'https://calendly.com/abo/retention' },
+    conditions: ['MRR > 100'],
+    stats: { shown: 8, accepted: 6, acceptRate: 75, mrrSaved: 820 },
+    isActive: true,
+  },
+];

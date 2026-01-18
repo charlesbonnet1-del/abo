@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/badge';
 import { CoachChips } from '@/components/coach';
 import { PeriodSelector, WarningsGrid, Period, KpiCard, KpiModal, KpiType } from '@/components/dashboard';
+import { WinsSection } from '@/components/wins';
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>('30d');
@@ -70,6 +71,11 @@ export default function DashboardPage() {
         onClose={() => setActiveKpiModal(null)}
         kpiType={activeKpiModal || 'mrr'}
       />
+
+      {/* Wins Section */}
+      <div className="mb-8">
+        <WinsSection />
+      </div>
 
       {/* Warnings Grid */}
       <div className="mb-8">
