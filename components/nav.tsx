@@ -11,8 +11,8 @@ interface NavItem {
   children?: { href: string; label: string }[];
 }
 
-const navItems: NavItem[] = [
-  { href: '/', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+const baseNavItems: NavItem[] = [
+  { href: '', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   {
     href: '/analytics',
     label: 'Analytics',
@@ -46,20 +46,37 @@ const navItems: NavItem[] = [
   },
 ];
 
-// Simplified nav for mobile (only show 5 most important)
-const mobileNavItems = navItems.filter(item =>
-  ['/', '/users', '/automations', '/emails', '/settings'].includes(item.href)
-);
+interface NavigationProps {
+  basePath?: string;
+}
 
-export function Navigation() {
+export function Navigation({ basePath = '' }: NavigationProps) {
   const pathname = usePathname();
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+
+  // Apply base path to all nav items
+  const navItems: NavItem[] = baseNavItems.map(item => ({
+    ...item,
+    href: basePath + item.href || basePath || '/',
+    children: item.children?.map(child => ({
+      ...child,
+      href: basePath + child.href,
+    })),
+  }));
+
+  // Simplified nav for mobile (only show 5 most important)
+  const mobileNavItems = navItems.filter(item =>
+    [basePath || '/', `${basePath}/users`, `${basePath}/automations`, `${basePath}/emails`, `${basePath}/settings`].includes(item.href)
+  );
 
   const isItemActive = (item: NavItem) => {
     if (item.children) {
       return item.children.some(child => pathname === child.href) || pathname.startsWith(item.href);
     }
-    return pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+    if (item.href === basePath || item.href === '/') {
+      return pathname === item.href || pathname === basePath;
+    }
+    return pathname === item.href || pathname.startsWith(item.href);
   };
 
   return (
@@ -100,9 +117,11 @@ export function Navigation() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 flex-col z-50">
         <div className="p-6 border-b border-gray-100">
-          <Link href="/">
+          <Link href={basePath || '/'}>
             <h1 className="text-2xl font-bold text-indigo-600">Abo</h1>
-            <p className="text-sm text-gray-500 mt-1">Ton copilote abonnements</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {basePath === '/demo' ? 'Demo - Maquette interactive' : 'Ton copilote abonnements'}
+            </p>
           </Link>
         </div>
         <nav className="flex-1 p-4 overflow-y-auto">
@@ -201,6 +220,21 @@ export function Navigation() {
             })}
           </ul>
         </nav>
+
+        {/* Back to home link for demo */}
+        {basePath === '/demo' && (
+          <div className="p-4 border-t border-gray-200">
+            <Link
+              href="/"
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Retour a l&apos;accueil
+            </Link>
+          </div>
+        )}
       </aside>
     </>
   );

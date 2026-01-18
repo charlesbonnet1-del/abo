@@ -1,146 +1,48 @@
-import prisma from '@/lib/prisma';
-import { SubscriberStatus } from '@prisma/client';
+// Metrics functions - stub implementations
+// These will be implemented when database integration is added
+
+export type SubscriberStatus = 'ACTIVE' | 'AT_RISK' | 'TRIAL' | 'CHURNED';
 
 export async function getMRR(userId: string): Promise<number> {
-  const result = await prisma.subscriber.aggregate({
-    where: {
-      userId,
-      status: {
-        in: ['ACTIVE', 'TRIAL'],
-      },
-    },
-    _sum: {
-      mrr: true,
-    },
-  });
-
-  return result._sum.mrr || 0;
+  console.log(`[Stub] getMRR called for user ${userId}`);
+  return 0;
 }
 
 export async function getSubscriberCount(
   userId: string,
   status?: SubscriberStatus
 ): Promise<number> {
-  return prisma.subscriber.count({
-    where: {
-      userId,
-      ...(status && { status }),
-    },
-  });
+  console.log(`[Stub] getSubscriberCount called for user ${userId}, status: ${status}`);
+  return 0;
 }
 
 export async function getChurnRate(
   userId: string,
   periodDays: number = 30
 ): Promise<number> {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - periodDays);
-
-  // Get subscribers at start of period (approximate by using firstSeenAt < startDate)
-  const subscribersAtStart = await prisma.subscriber.count({
-    where: {
-      userId,
-      firstSeenAt: {
-        lt: startDate,
-      },
-    },
-  });
-
-  if (subscribersAtStart === 0) {
-    return 0;
-  }
-
-  // Get churned subscribers in the period
-  const churnedInPeriod = await prisma.subscriber.count({
-    where: {
-      userId,
-      status: 'CHURNED',
-      updatedAt: {
-        gte: startDate,
-      },
-    },
-  });
-
-  return Math.round((churnedInPeriod / subscribersAtStart) * 100 * 10) / 10;
+  console.log(`[Stub] getChurnRate called for user ${userId}, period: ${periodDays} days`);
+  return 0;
 }
 
 export async function getAverageLTV(userId: string): Promise<number> {
-  const result = await prisma.subscriber.aggregate({
-    where: {
-      userId,
-      ltv: {
-        gt: 0,
-      },
-    },
-    _avg: {
-      ltv: true,
-    },
-  });
-
-  return Math.round(result._avg.ltv || 0);
+  console.log(`[Stub] getAverageLTV called for user ${userId}`);
+  return 0;
 }
 
 export async function getMRRGrowth(
   userId: string,
   periodDays: number = 30
 ): Promise<number> {
-  // This is a simplified calculation
-  // In production, you'd want to track historical MRR snapshots
-  const currentMRR = await getMRR(userId);
-
-  // Get MRR from subscribers who joined before the period
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - periodDays);
-
-  const previousMRR = await prisma.subscriber.aggregate({
-    where: {
-      userId,
-      status: {
-        in: ['ACTIVE', 'TRIAL'],
-      },
-      firstSeenAt: {
-        lt: startDate,
-      },
-    },
-    _sum: {
-      mrr: true,
-    },
-  });
-
-  const prevMRRValue = previousMRR._sum.mrr || 0;
-
-  if (prevMRRValue === 0) {
-    return currentMRR > 0 ? 100 : 0;
-  }
-
-  return Math.round(((currentMRR - prevMRRValue) / prevMRRValue) * 100 * 10) / 10;
+  console.log(`[Stub] getMRRGrowth called for user ${userId}, period: ${periodDays} days`);
+  return 0;
 }
 
 export async function getSubscriberCountChange(
   userId: string,
   periodDays: number = 30
 ): Promise<number> {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - periodDays);
-
-  const newSubscribers = await prisma.subscriber.count({
-    where: {
-      userId,
-      firstSeenAt: {
-        gte: startDate,
-      },
-    },
-  });
-
-  const totalSubscribers = await prisma.subscriber.count({
-    where: { userId },
-  });
-
-  if (totalSubscribers === 0) {
-    return 0;
-  }
-
-  return Math.round((newSubscribers / totalSubscribers) * 100 * 10) / 10;
+  console.log(`[Stub] getSubscriberCountChange called for user ${userId}, period: ${periodDays} days`);
+  return 0;
 }
 
 export interface DashboardMetrics {
@@ -157,40 +59,17 @@ export interface DashboardMetrics {
 }
 
 export async function getDashboardMetrics(userId: string): Promise<DashboardMetrics> {
-  const [
-    mrr,
-    mrrChange,
-    totalSubscribers,
-    subscribersChange,
-    churnRate,
-    avgLtv,
-    activeCount,
-    atRiskCount,
-    trialCount,
-    churnedCount,
-  ] = await Promise.all([
-    getMRR(userId),
-    getMRRGrowth(userId),
-    getSubscriberCount(userId),
-    getSubscriberCountChange(userId),
-    getChurnRate(userId),
-    getAverageLTV(userId),
-    getSubscriberCount(userId, 'ACTIVE'),
-    getSubscriberCount(userId, 'AT_RISK'),
-    getSubscriberCount(userId, 'TRIAL'),
-    getSubscriberCount(userId, 'CHURNED'),
-  ]);
-
+  console.log(`[Stub] getDashboardMetrics called for user ${userId}`);
   return {
-    mrr,
-    mrrChange,
-    totalSubscribers,
-    subscribersChange,
-    churnRate,
-    avgLtv,
-    activeCount,
-    atRiskCount,
-    trialCount,
-    churnedCount,
+    mrr: 0,
+    mrrChange: 0,
+    totalSubscribers: 0,
+    subscribersChange: 0,
+    churnRate: 0,
+    avgLtv: 0,
+    activeCount: 0,
+    atRiskCount: 0,
+    trialCount: 0,
+    churnedCount: 0,
   };
 }

@@ -16,7 +16,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      <Navigation basePath="/demo" />
 
       {/* Header */}
       <header className="fixed top-0 right-0 left-0 md:left-64 h-16 bg-white border-b border-gray-200 z-40 flex items-center justify-end px-6">

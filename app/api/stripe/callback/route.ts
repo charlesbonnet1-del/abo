@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/supabase/server';
-import prisma from '@/lib/prisma';
 import { syncStripeData } from '@/lib/stripe/sync';
 
 export const dynamic = 'force-dynamic';
@@ -65,14 +64,10 @@ export async function GET(request: Request) {
 
     const { access_token, stripe_user_id } = data;
 
-    // Update user with Stripe credentials
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        stripeAccountId: stripe_user_id,
-        stripeAccessToken: access_token,
-        stripeConnectedAt: new Date(),
-      },
+    // TODO: Store Stripe credentials in Supabase when database is configured
+    console.log(`[Stub] Would save Stripe credentials for user ${user.id}:`, {
+      stripeAccountId: stripe_user_id,
+      stripeAccessToken: access_token ? '[REDACTED]' : null,
     });
 
     // Trigger initial sync (async, don't wait)

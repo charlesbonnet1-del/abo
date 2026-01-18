@@ -1,4 +1,6 @@
-import { SubscriberStatus } from '@prisma/client';
+// Health score calculation utilities
+
+export type SubscriberStatus = 'ACTIVE' | 'AT_RISK' | 'TRIAL' | 'CHURNED';
 
 interface HealthScoreInput {
   failedPayments: number;
