@@ -54,7 +54,7 @@ export default function LoginPage() {
       setMessage({ type: 'error', text: error.message });
       setLoading(false);
     } else {
-      router.push('/');
+      router.push('/dashboard');
     }
   };
 
@@ -91,8 +91,12 @@ export default function LoginPage() {
               <ul className="list-disc pl-5 space-y-1">
                 <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code></li>
                 <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code></li>
-                <li><code className="bg-gray-100 px-1 rounded">DATABASE_URL</code></li>
               </ul>
+            </div>
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <Link href="/" className="text-sm text-indigo-600 hover:underline">
+                ← Retour a l&apos;accueil
+              </Link>
             </div>
           </div>
         </div>

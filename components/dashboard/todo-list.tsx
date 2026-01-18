@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ActionType } from '@prisma/client';
 import { Button } from '@/components/ui/button';
+
+export type ActionType = 'REACH_OUT' | 'OFFER_DISCOUNT' | 'UPDATE_CARD' | 'CONVERT_TRIAL' | 'CELEBRATE_ANNIVERSARY';
 
 interface TodoItem {
   id: string;

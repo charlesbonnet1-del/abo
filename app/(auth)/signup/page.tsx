@@ -100,7 +100,7 @@ export default function SignupPage() {
       }
 
       // Now redirect with session established
-      window.location.href = '/';
+      window.location.href = '/dashboard';
       return;
     }
     setLoading(false);
