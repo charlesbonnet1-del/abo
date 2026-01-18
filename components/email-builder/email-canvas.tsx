@@ -21,6 +21,8 @@ interface EmailCanvasProps {
   onSelectBlock: (blockId: string | null) => void;
   onUpdateBlocks: (blocks: EmailBlock[]) => void;
   previewVariables: Record<string, string>;
+  showPoweredBy?: boolean;
+  userPlan?: 'free' | 'starter' | 'growth' | 'team' | 'scale';
 }
 
 export function EmailCanvas({
@@ -29,6 +31,8 @@ export function EmailCanvas({
   onSelectBlock,
   onUpdateBlocks,
   previewVariables,
+  showPoweredBy = true,
+  userPlan = 'starter',
 }: EmailCanvasProps) {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -256,8 +260,49 @@ export function EmailCanvas({
               </div>
             )}
           </div>
+
+          {/* Powered by Abo footer */}
+          {showPoweredBy && (
+            <PoweredByAbo userPlan={userPlan} />
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Powered by Abo Footer Component
+function PoweredByAbo({ userPlan }: { userPlan: 'free' | 'starter' | 'growth' | 'team' | 'scale' }) {
+  const isMandatory = userPlan === 'free' || userPlan === 'starter';
+
+  return (
+    <div className="bg-gray-50 border-t border-gray-200 px-6 py-4">
+      <div className="flex items-center justify-center gap-2">
+        <a
+          href="https://abo.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          <span className="text-xs font-medium">Powered by Abo</span>
+        </a>
+        {isMandatory && (
+          <span className="text-xs text-gray-400 ml-2" title="Passez au plan Growth pour retirer ce badge">
+            (obligatoire)
+          </span>
+        )}
+      </div>
+      {isMandatory && (
+        <p className="text-center text-xs text-gray-400 mt-1">
+          <a href="/settings/billing" className="underline hover:text-gray-600">
+            Passez a Growth
+          </a>
+          {' '}pour retirer ce badge
+        </p>
+      )}
     </div>
   );
 }

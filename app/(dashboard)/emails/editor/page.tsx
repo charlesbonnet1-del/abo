@@ -56,12 +56,20 @@ const defaultBlocks: EmailBlock[] = [
   },
 ];
 
+// Simulated user plan - in production, this would come from user context
+type UserPlan = 'free' | 'starter' | 'growth' | 'team' | 'scale';
+
 export default function EmailEditorPage() {
   const [blocks, setBlocks] = useState<EmailBlock[]>(defaultBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
   const [subject, setSubject] = useState('Bienvenue sur Abo, {name}!');
   const [previewMode, setPreviewMode] = useState(false);
+  // Simulated plan - change to 'growth', 'team', or 'scale' to allow hiding the badge
+  const [userPlan] = useState<UserPlan>('starter');
+  const [showPoweredBy, setShowPoweredBy] = useState(true);
+
+  const canHidePoweredBy = userPlan === 'growth' || userPlan === 'team' || userPlan === 'scale';
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
 
@@ -251,6 +259,28 @@ export default function EmailEditorPage() {
               <option value="reengagement">Reengagement</option>
             </select>
 
+            {/* Powered by Abo toggle */}
+            <div className="flex items-center gap-2">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showPoweredBy}
+                  onChange={(e) => canHidePoweredBy && setShowPoweredBy(e.target.checked)}
+                  disabled={!canHidePoweredBy}
+                  className="sr-only peer"
+                />
+                <div className={`w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 ${!canHidePoweredBy ? 'opacity-50 cursor-not-allowed' : ''}`} />
+              </label>
+              <span className="text-xs text-gray-500">
+                Badge Abo
+                {!canHidePoweredBy && (
+                  <span className="ml-1 text-amber-600" title="Passez au plan Growth pour desactiver">
+                    (plan {userPlan})
+                  </span>
+                )}
+              </span>
+            </div>
+
             <button
               onClick={() => setPreviewMode(!previewMode)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -320,6 +350,8 @@ export default function EmailEditorPage() {
           onSelectBlock={previewMode ? () => {} : setSelectedBlockId}
           onUpdateBlocks={setBlocks}
           previewVariables={previewVariables}
+          showPoweredBy={showPoweredBy}
+          userPlan={userPlan}
         />
 
         {!previewMode && (
