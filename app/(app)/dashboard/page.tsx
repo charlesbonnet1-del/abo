@@ -118,14 +118,14 @@ export default async function DashboardPage() {
               <h2 className="text-xl font-bold text-gray-900 mb-6">Actions rapides</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Link
-                  href="/connect"
+                  href="/settings"
                   className="p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
                 >
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Gerer Stripe
+                    Parametres
                   </h3>
                   <p className="text-gray-600 text-sm">
-                    Synchroniser les donnees ou deconnecter Stripe
+                    Gerer Stripe, synchroniser les donnees
                   </p>
                 </Link>
 
@@ -162,7 +162,7 @@ export default async function DashboardPage() {
                   Connecte ton compte Stripe pour commencer a synchroniser tes abonnes.
                 </p>
                 <Link
-                  href="/connect"
+                  href="/settings"
                   className="inline-block px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                   Connecter Stripe
