@@ -1,42 +1,32 @@
 import { NextResponse } from 'next/server';
-import { getUser } from '@/lib/supabase/server';
-import { syncStripeData } from '@/lib/stripe/sync';
+import { createClient, getUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const state = searchParams.get('state');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   // Handle errors from Stripe
   if (error) {
     console.error('Stripe OAuth error:', error, errorDescription);
     return NextResponse.redirect(
-      `${appUrl}/settings?error=${encodeURIComponent(errorDescription || error)}`
+      `${appUrl}/connect?error=${encodeURIComponent(errorDescription || error)}`
     );
   }
 
-  if (!code || !state) {
-    return NextResponse.redirect(`${appUrl}/settings?error=missing_params`);
+  if (!code) {
+    return NextResponse.redirect(`${appUrl}/connect?error=missing_code`);
   }
 
-  // Verify state and get user ID
-  let stateData: { userId: string };
-  try {
-    stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-  } catch {
-    return NextResponse.redirect(`${appUrl}/settings?error=invalid_state`);
-  }
-
-  // Verify the current user matches the state
+  // Verify the user is logged in
   const user = await getUser();
-  if (!user || user.id !== stateData.userId) {
-    return NextResponse.redirect(`${appUrl}/settings?error=user_mismatch`);
+  if (!user) {
+    return NextResponse.redirect(`${appUrl}/login`);
   }
 
   try {
@@ -58,26 +48,35 @@ export async function GET(request: Request) {
     if (data.error) {
       console.error('Stripe token exchange error:', data.error);
       return NextResponse.redirect(
-        `${appUrl}/settings?error=${encodeURIComponent(data.error_description || data.error)}`
+        `${appUrl}/connect?error=${encodeURIComponent(data.error_description || data.error)}`
       );
     }
 
     const { access_token, stripe_user_id } = data;
 
-    // TODO: Store Stripe credentials in Supabase when database is configured
-    console.log(`[Stub] Would save Stripe credentials for user ${user.id}:`, {
-      stripeAccountId: stripe_user_id,
-      stripeAccessToken: access_token ? '[REDACTED]' : null,
-    });
+    // Store Stripe credentials in Supabase
+    const supabase = await createClient();
+    if (!supabase) {
+      return NextResponse.redirect(`${appUrl}/connect?error=database_error`);
+    }
 
-    // Trigger initial sync (async, don't wait)
-    syncStripeData(user.id, access_token).catch((err) => {
-      console.error('Initial sync failed:', err);
-    });
+    const { error: updateError } = await supabase
+      .from('user')
+      .update({
+        stripeaccountid: stripe_user_id,
+        stripeaccesstoken: access_token,
+        stripeconnectedat: new Date().toISOString(),
+      })
+      .eq('id', user.id);
 
-    return NextResponse.redirect(`${appUrl}/settings?success=stripe_connected`);
+    if (updateError) {
+      console.error('Failed to save Stripe credentials:', updateError);
+      return NextResponse.redirect(`${appUrl}/connect?error=save_failed`);
+    }
+
+    return NextResponse.redirect(`${appUrl}/connect?success=true`);
   } catch (err) {
     console.error('Stripe callback error:', err);
-    return NextResponse.redirect(`${appUrl}/settings?error=connection_failed`);
+    return NextResponse.redirect(`${appUrl}/connect?error=connection_failed`);
   }
 }
