@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient, getUser } from '@/lib/supabase/server';
+import { createAdminClient, getUser } from '@/lib/supabase/server';
 import { createConnectedStripeClient } from '@/lib/stripe';
 import type Stripe from 'stripe';
 
@@ -34,9 +34,10 @@ export async function POST() {
     return NextResponse.json({ error: 'not_authenticated' }, { status: 401 });
   }
 
-  // Get Supabase client
-  const supabase = await createClient();
+  // Get Supabase admin client (bypasses RLS for sync operations)
+  const supabase = createAdminClient();
   if (!supabase) {
+    console.error('Failed to create admin client - check SUPABASE_SERVICE_ROLE_KEY');
     return NextResponse.json({ error: 'database_error' }, { status: 500 });
   }
 
@@ -242,7 +243,17 @@ export async function POST() {
     });
   } catch (err) {
     console.error('Sync error:', err);
-    return NextResponse.json({ error: 'sync_failed' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    // Check if it's a Stripe error
+    if (err && typeof err === 'object' && 'type' in err) {
+      const stripeErr = err as { type: string; message?: string };
+      console.error('Stripe error type:', stripeErr.type);
+      return NextResponse.json({
+        error: 'stripe_error',
+        details: stripeErr.message || stripeErr.type
+      }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'sync_failed', details: message }, { status: 500 });
   }
 }
 

@@ -116,7 +116,10 @@ export default function SettingsPage() {
         setSyncMessage({ type: 'success', text: `${result.synced || 0} subscribers synchronises` });
         await fetchData(); // Refresh data
       } else {
-        setSyncMessage({ type: 'error', text: result.error || 'Erreur lors de la synchronisation' });
+        const errorText = result.details
+          ? `${result.error}: ${result.details}`
+          : result.error || 'Erreur lors de la synchronisation';
+        setSyncMessage({ type: 'error', text: errorText });
       }
     } catch {
       setSyncMessage({ type: 'error', text: 'Erreur de connexion' });
