@@ -6,50 +6,53 @@ import type Stripe from 'stripe';
 export const dynamic = 'force-dynamic';
 
 interface SubscriberData {
-  userid: string;
-  stripecustomerid: string;
+  user_id: string;
+  stripe_customer_id: string;
   email: string | null;
   name: string | null;
-  status: string;
-  healthscore: number;
-  plan: string | null;
+  subscription_status: string;
   mrr: number;
-  ltv: number;
-  currentperiodend: string | null;
-  cardexpiresat: string | null;
-  firstseenat: string;
-  createdat: string;
-  updatedat: string;
+  plan_name: string | null;
+  plan_interval: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  payment_method_type: string | null;
+  payment_method_last4: string | null;
+  currency: string;
+  country: string | null;
+  lifetime_value: number;
+  last_payment_at: string | null;
+  last_payment_status: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export async function POST() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
   // Get current user
   const user = await getUser();
   if (!user) {
-    return NextResponse.redirect(`${appUrl}/login`);
+    return NextResponse.json({ error: 'not_authenticated' }, { status: 401 });
   }
 
   // Get Supabase client
   const supabase = await createClient();
   if (!supabase) {
-    return NextResponse.redirect(`${appUrl}/connect?error=database_error`);
+    return NextResponse.json({ error: 'database_error' }, { status: 500 });
   }
 
   // Get user's Stripe access token
   const { data: userData, error: userError } = await supabase
     .from('user')
-    .select('stripeaccesstoken')
+    .select('stripe_access_token')
     .eq('id', user.id)
     .single();
 
-  if (userError || !userData?.stripeaccesstoken) {
-    return NextResponse.redirect(`${appUrl}/connect?error=not_connected`);
+  if (userError || !userData?.stripe_access_token) {
+    return NextResponse.json({ error: 'not_connected' }, { status: 400 });
   }
 
   try {
-    const stripe = createConnectedStripeClient(userData.stripeaccesstoken);
+    const stripe = createConnectedStripeClient(userData.stripe_access_token);
 
     // Fetch all customers with subscriptions
     const subscribers: SubscriberData[] = [];
@@ -60,7 +63,7 @@ export async function POST() {
     while (hasMore) {
       const subscriptions: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
         status: 'all',
-        expand: ['data.customer', 'data.items.data.price.product'],
+        expand: ['data.customer', 'data.items.data.price.product', 'data.default_payment_method'],
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       });
@@ -71,28 +74,27 @@ export async function POST() {
         // Skip deleted customers
         if (customer.deleted) continue;
 
-        // Get payment method for card expiry
-        let cardExpiresAt: string | null = null;
-        if (customer.invoice_settings?.default_payment_method) {
-          try {
-            const pm = await stripe.paymentMethods.retrieve(
-              customer.invoice_settings.default_payment_method as string
-            );
-            if (pm.card) {
-              const expDate = new Date(pm.card.exp_year, pm.card.exp_month - 1);
-              cardExpiresAt = expDate.toISOString();
-            }
-          } catch {
-            // Payment method might not be accessible
+        // Get payment method info
+        let paymentMethodType: string | null = null;
+        let paymentMethodLast4: string | null = null;
+        const defaultPm = subscription.default_payment_method as Stripe.PaymentMethod | null;
+        if (defaultPm) {
+          paymentMethodType = defaultPm.type;
+          if (defaultPm.card) {
+            paymentMethodLast4 = defaultPm.card.last4;
+          } else if (defaultPm.sepa_debit) {
+            paymentMethodLast4 = defaultPm.sepa_debit.last4 || null;
           }
         }
 
         // Calculate MRR from subscription
         let mrr = 0;
+        let planInterval: string | null = null;
         const priceItem = subscription.items.data[0];
         if (priceItem?.price) {
           const price = priceItem.price;
           const amount = price.unit_amount || 0;
+          planInterval = price.recurring?.interval || null;
 
           // Normalize to monthly
           if (price.recurring?.interval === 'year') {
@@ -123,32 +125,37 @@ export async function POST() {
           status = 'past_due';
         }
 
-        // Calculate health score (simple heuristic)
-        let healthScore = 70;
-        if (status === 'active') healthScore = 85;
-        if (status === 'trialing') healthScore = 60;
-        if (status === 'past_due') healthScore = 30;
-        if (status === 'canceled') healthScore = 10;
-        if (status === 'unpaid') healthScore = 20;
+        // Get period dates
+        const rawSub = subscription as unknown as {
+          current_period_start?: number;
+          current_period_end?: number;
+        };
 
         const now = new Date().toISOString();
         const subscriberData: SubscriberData = {
-          userid: user.id,
-          stripecustomerid: customer.id,
+          user_id: user.id,
+          stripe_customer_id: customer.id,
           email: customer.email ?? null,
           name: customer.name ?? null,
-          status,
-          healthscore: healthScore,
-          plan: planName,
+          subscription_status: status,
           mrr,
-          ltv: 0, // Will be calculated from invoices later
-          currentperiodend: (subscription as unknown as { current_period_end?: number }).current_period_end
-            ? new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000).toISOString()
+          plan_name: planName,
+          plan_interval: planInterval,
+          current_period_start: rawSub.current_period_start
+            ? new Date(rawSub.current_period_start * 1000).toISOString()
             : null,
-          cardexpiresat: cardExpiresAt,
-          firstseenat: new Date(customer.created * 1000).toISOString(),
-          createdat: now,
-          updatedat: now,
+          current_period_end: rawSub.current_period_end
+            ? new Date(rawSub.current_period_end * 1000).toISOString()
+            : null,
+          payment_method_type: paymentMethodType,
+          payment_method_last4: paymentMethodLast4,
+          currency: subscription.currency || 'eur',
+          country: customer.address?.country || null,
+          lifetime_value: 0, // Will be calculated from invoices later
+          last_payment_at: null, // Will be set from latest invoice
+          last_payment_status: null,
+          created_at: new Date(customer.created * 1000).toISOString(),
+          updated_at: now,
         };
 
         subscribers.push(subscriberData);
@@ -160,26 +167,82 @@ export async function POST() {
       }
     }
 
+    // Also fetch customers without subscriptions
+    hasMore = true;
+    startingAfter = undefined;
+
+    while (hasMore) {
+      const customers: Stripe.ApiList<Stripe.Customer> = await stripe.customers.list({
+        limit: 100,
+        ...(startingAfter && { starting_after: startingAfter }),
+      });
+
+      for (const customer of customers.data) {
+        if (customer.deleted) continue;
+
+        // Skip if already have this customer from subscriptions
+        if (subscribers.some(s => s.stripe_customer_id === customer.id)) continue;
+
+        const now = new Date().toISOString();
+        subscribers.push({
+          user_id: user.id,
+          stripe_customer_id: customer.id,
+          email: customer.email ?? null,
+          name: customer.name ?? null,
+          subscription_status: 'none',
+          mrr: 0,
+          plan_name: null,
+          plan_interval: null,
+          current_period_start: null,
+          current_period_end: null,
+          payment_method_type: null,
+          payment_method_last4: null,
+          currency: 'eur',
+          country: customer.address?.country || null,
+          lifetime_value: 0,
+          last_payment_at: null,
+          last_payment_status: null,
+          created_at: new Date(customer.created * 1000).toISOString(),
+          updated_at: now,
+        });
+      }
+
+      hasMore = customers.has_more;
+      if (customers.data.length > 0) {
+        startingAfter = customers.data[customers.data.length - 1].id;
+      }
+    }
+
     // Upsert subscribers to database
+    let synced = 0;
     for (const subscriber of subscribers) {
       const { error: upsertError } = await supabase
         .from('subscriber')
         .upsert(subscriber, {
-          onConflict: 'stripecustomerid,userid',
+          onConflict: 'user_id,stripe_customer_id',
         });
 
       if (upsertError) {
         console.error('Failed to upsert subscriber:', upsertError);
+      } else {
+        synced++;
       }
     }
 
-    // Redirect back to connect page with success
-    return NextResponse.redirect(
-      `${appUrl}/connect?synced=${subscribers.length}`
-    );
+    // Update last_sync_at on user
+    await supabase
+      .from('user')
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    return NextResponse.json({
+      success: true,
+      synced,
+      total: subscribers.length,
+    });
   } catch (err) {
     console.error('Sync error:', err);
-    return NextResponse.redirect(`${appUrl}/connect?error=sync_failed`);
+    return NextResponse.json({ error: 'sync_failed' }, { status: 500 });
   }
 }
 
