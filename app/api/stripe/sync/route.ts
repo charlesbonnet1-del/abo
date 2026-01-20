@@ -64,7 +64,7 @@ export async function POST() {
     while (hasMore) {
       const subscriptions: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
         status: 'all',
-        expand: ['data.customer', 'data.items.data.price.product', 'data.default_payment_method'],
+        expand: ['data.customer', 'data.items.data.price', 'data.default_payment_method'],
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       });
@@ -109,14 +109,15 @@ export async function POST() {
           }
         }
 
-        // Get plan name
+        // Get plan name from price nickname or product ID
         let planName: string | null = null;
         if (priceItem?.price) {
           const price = priceItem.price;
           if (price.nickname) {
             planName = price.nickname;
-          } else if (typeof price.product === 'object' && price.product && 'name' in price.product) {
-            planName = (price.product as Stripe.Product).name;
+          } else if (typeof price.product === 'string') {
+            // Product not expanded, use price ID as fallback
+            planName = price.id;
           }
         }
 
