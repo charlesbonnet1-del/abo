@@ -9,7 +9,7 @@ async function getUserIdFromStripeAccount(stripeAccountId: string): Promise<stri
   const { data } = await supabase
     .from('user')
     .select('id')
-    .eq('stripeaccountid', stripeAccountId)
+    .eq('stripe_account_id', stripeAccountId)
     .single();
 
   return data?.id || null;
@@ -26,16 +26,16 @@ async function upsertSubscriber(
 
   const now = new Date().toISOString();
   const subscriberData = {
-    userid: userId,
-    stripecustomerid: customerId,
+    user_id: userId,
+    stripe_customer_id: customerId,
     ...data,
-    updatedat: now,
+    updated_at: now,
   };
 
   await supabase
     .from('subscriber')
     .upsert(subscriberData, {
-      onConflict: 'stripecustomerid,userid',
+      onConflict: 'user_id,stripe_customer_id',
     });
 }
 
@@ -54,14 +54,11 @@ export async function handleCustomerCreated(
     return;
   }
 
-  const now = new Date().toISOString();
   await upsertSubscriber(userId, customer.id, {
     email: customer.email,
     name: customer.name,
-    status: 'active',
-    healthscore: 70,
-    firstseenat: new Date(customer.created * 1000).toISOString(),
-    createdat: now,
+    subscription_status: 'none',
+    created_at: new Date(customer.created * 1000).toISOString(),
   });
 
   console.log(`Created subscriber for customer ${customer.id}`);
@@ -99,10 +96,13 @@ export async function handleSubscriptionCreated(
 
   // Calculate MRR
   let mrr = 0;
+  let planInterval: string | null = null;
   const priceItem = subscription.items.data[0];
   if (priceItem?.price) {
     const price = priceItem.price;
     const amount = price.unit_amount || 0;
+    planInterval = price.recurring?.interval || null;
+
     if (price.recurring?.interval === 'year') {
       mrr = Math.round(amount / 12);
     } else if (price.recurring?.interval === 'month') {
@@ -116,15 +116,22 @@ export async function handleSubscriptionCreated(
     planName = priceItem.price.nickname;
   }
 
-  // Access current_period_end from raw subscription data
-  const rawSub = subscription as unknown as { current_period_end?: number };
+  // Access period dates from raw subscription data
+  const rawSub = subscription as unknown as {
+    current_period_start?: number;
+    current_period_end?: number;
+  };
 
   await upsertSubscriber(userId, customerId, {
-    status: subscription.status,
-    plan: planName,
+    subscription_status: subscription.status,
+    plan_name: planName,
+    plan_interval: planInterval,
     mrr,
-    healthscore: subscription.status === 'active' ? 85 : 60,
-    currentperiodend: rawSub.current_period_end
+    currency: subscription.currency || 'eur',
+    current_period_start: rawSub.current_period_start
+      ? new Date(rawSub.current_period_start * 1000).toISOString()
+      : null,
+    current_period_end: rawSub.current_period_end
       ? new Date(rawSub.current_period_end * 1000).toISOString()
       : null,
   });
@@ -154,8 +161,7 @@ export async function handleSubscriptionDeleted(
     : subscription.customer.id;
 
   await upsertSubscriber(userId, customerId, {
-    status: 'canceled',
-    healthscore: 10,
+    subscription_status: 'canceled',
   });
 
   console.log(`Marked subscription as canceled for customer ${customerId}`);
@@ -182,18 +188,22 @@ export async function handleInvoicePaid(
 
   const { data: subscriber } = await supabase
     .from('subscriber')
-    .select('ltv')
-    .eq('userid', userId)
-    .eq('stripecustomerid', customerId)
+    .select('lifetime_value')
+    .eq('user_id', userId)
+    .eq('stripe_customer_id', customerId)
     .single();
 
-  const currentLtv = subscriber?.ltv || 0;
+  const currentLtv = subscriber?.lifetime_value || 0;
   const invoiceAmount = invoice.amount_paid || 0;
+  const paidAt = invoice.status_transitions?.paid_at
+    ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+    : new Date().toISOString();
 
   await upsertSubscriber(userId, customerId, {
-    status: 'active',
-    healthscore: 85,
-    ltv: currentLtv + invoiceAmount,
+    subscription_status: 'active',
+    lifetime_value: currentLtv + invoiceAmount,
+    last_payment_at: paidAt,
+    last_payment_status: 'succeeded',
   });
 
   console.log(`Invoice paid for customer ${customerId}, updated LTV`);
@@ -215,8 +225,8 @@ export async function handleInvoicePaymentFailed(
   if (!customerId) return;
 
   await upsertSubscriber(userId, customerId, {
-    status: 'past_due',
-    healthscore: 30,
+    subscription_status: 'past_due',
+    last_payment_status: 'failed',
   });
 
   console.log(`Payment failed for customer ${customerId}`);
@@ -237,12 +247,7 @@ export async function handleCustomerSourceExpiring(
 
   if (!customerId) return;
 
-  // Set card expiry date
-  const expDate = new Date(source.exp_year, source.exp_month - 1);
-
-  await upsertSubscriber(userId, customerId, {
-    cardexpiresat: expDate.toISOString(),
-  });
-
+  // Just log, we don't have a card_expires_at column anymore
+  // Could add a notification or agent action here
   console.log(`Card expiring for customer ${customerId}`);
 }

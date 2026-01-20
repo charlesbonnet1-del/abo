@@ -1,78 +1,155 @@
+'use client';
+
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { createClient, getUser } from '@/lib/supabase/server';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { getStripeConnectUrl } from '@/lib/stripe';
 
-export default async function SettingsPage() {
-  const supabase = await createClient();
-  const user = await getUser();
+interface UserData {
+  stripe_account_id: string | null;
+  stripe_account_name: string | null;
+  stripe_connected: boolean;
+  last_sync_at: string | null;
+}
 
-  if (!supabase || !user) {
-    redirect('/login');
-  }
+export default function SettingsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Get user's Stripe connection status from database
-  const { data: userData } = await supabase
-    .from('user')
-    .select('stripeaccountid, stripeconnectedat')
-    .eq('id', user.id)
-    .single();
+  // Get URL params
+  const [urlParams, setUrlParams] = useState<{ success?: string; error?: string; auto_sync?: string }>({});
 
-  const isConnected = !!userData?.stripeaccountid;
-  const connectedAt = userData?.stripeconnectedat
-    ? new Date(userData.stripeconnectedat).toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
-
-  // Get last sync info
-  let lastSyncInfo = null;
-  let subscriberCount = 0;
-  if (isConnected) {
-    const { count, data: latestSubscriber } = await supabase
-      .from('subscriber')
-      .select('updatedat', { count: 'exact' })
-      .eq('userid', user.id)
-      .order('updatedat', { ascending: false })
-      .limit(1);
-
-    subscriberCount = count || 0;
-    if (latestSubscriber && latestSubscriber.length > 0) {
-      lastSyncInfo = new Date(latestSubscriber[0].updatedat).toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setUrlParams({
+        success: params.get('success') || undefined,
+        error: params.get('error') || undefined,
+        auto_sync: params.get('auto_sync') || undefined,
       });
+      // Clean URL after reading params
+      if (params.toString()) {
+        window.history.replaceState({}, '', '/settings');
+      }
     }
-  }
+  }, []);
 
-  const stripeConnectUrl = getStripeConnectUrl();
-
-  async function disconnectStripe() {
-    'use server';
-    const supabase = await createClient();
-    const user = await getUser();
-
-    if (!supabase || !user) {
+  const fetchData = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase) {
+      router.push('/login');
       return;
     }
+
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      router.push('/login');
+      return;
+    }
+    setUser({ id: authUser.id, email: authUser.email || '' });
+
+    // Get user's Stripe connection status
+    const { data: userDataResult } = await supabase
+      .from('user')
+      .select('stripe_account_id, stripe_account_name, stripe_connected, last_sync_at')
+      .eq('id', authUser.id)
+      .single();
+
+    setUserData(userDataResult);
+
+    // Get subscriber count if connected
+    if (userDataResult?.stripe_connected) {
+      const { count } = await supabase
+        .from('subscriber')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', authUser.id);
+      setSubscriberCount(count || 0);
+    }
+
+    setLoading(false);
+  }, [router]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Auto-sync after connection
+  useEffect(() => {
+    if (urlParams.auto_sync === 'true' && userData?.stripe_connected && !syncing) {
+      handleSync();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlParams.auto_sync, userData?.stripe_connected]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch('/api/stripe/sync', {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (response.ok) {
+        setSyncMessage({ type: 'success', text: `${result.synced || 0} subscribers synchronises` });
+        await fetchData(); // Refresh data
+      } else {
+        setSyncMessage({ type: 'error', text: result.error || 'Erreur lors de la synchronisation' });
+      }
+    } catch {
+      setSyncMessage({ type: 'error', text: 'Erreur de connexion' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    const supabase = createClient();
+    if (!supabase || !user) return;
 
     await supabase
       .from('user')
       .update({
-        stripeaccountid: null,
-        stripeaccesstoken: null,
-        stripeconnectedat: null,
+        stripe_account_id: null,
+        stripe_account_name: null,
+        stripe_connected: false,
+        stripe_access_token: null,
+        last_sync_at: null,
       })
-      .eq('id', user.id);
+      .eq('id', user?.id);
 
-    redirect('/settings');
+    setUserData(null);
+    setSubscriberCount(0);
+    router.refresh();
+  };
+
+  const isConnected = userData?.stripe_connected === true;
+  const stripeConnectUrl = getStripeConnectUrl();
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
   }
 
   return (
@@ -100,6 +177,30 @@ export default async function SettingsPage() {
       <main className="max-w-4xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Parametres</h1>
 
+        {/* Success message */}
+        {urlParams.success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <p className="text-green-800 font-medium">Compte Stripe connecte avec succes!</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error message */}
+        {urlParams.error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <p className="text-red-800 font-medium">Erreur: {urlParams.error}</p>
+            </div>
+          </div>
+        )}
+
         {/* Account section */}
         <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Compte</h2>
@@ -107,7 +208,7 @@ export default async function SettingsPage() {
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <div>
                 <p className="font-medium text-gray-900">Email</p>
-                <p className="text-sm text-gray-500">{user.email}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
               </div>
             </div>
           </div>
@@ -138,11 +239,30 @@ export default async function SettingsPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="font-semibold text-green-800">Connected as {userData?.stripeaccountid}</p>
-                    <p className="text-sm text-green-600">Connecte le {connectedAt}</p>
+                    <p className="font-semibold text-green-800">
+                      Connecte a {userData?.stripe_account_name || userData?.stripe_account_id}
+                    </p>
+                    {userData?.last_sync_at && (
+                      <p className="text-sm text-green-600">
+                        Derniere synchro: {formatDate(userData.last_sync_at)}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Sync message */}
+              {syncMessage && (
+                <div className={`mb-6 p-4 rounded-xl ${
+                  syncMessage.type === 'success'
+                    ? 'bg-green-50 border border-green-200'
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  <p className={syncMessage.type === 'success' ? 'text-green-800' : 'text-red-800'}>
+                    {syncMessage.text}
+                  </p>
+                </div>
+              )}
 
               {/* Sync info */}
               <div className="mb-6 p-4 bg-gray-50 rounded-xl">
@@ -151,22 +271,28 @@ export default async function SettingsPage() {
                     <p className="font-medium text-gray-900">Subscribers importes</p>
                     <p className="text-2xl font-bold text-indigo-600">{subscriberCount}</p>
                   </div>
-                  {lastSyncInfo && (
+                  {userData?.last_sync_at && (
                     <div className="text-right">
                       <p className="text-sm text-gray-500">Derniere synchro</p>
-                      <p className="text-sm font-medium text-gray-700">{lastSyncInfo}</p>
+                      <p className="text-sm font-medium text-gray-700">{formatDate(userData.last_sync_at)}</p>
                     </div>
                   )}
                 </div>
 
-                <form action="/api/stripe/sync" method="POST">
-                  <button
-                    type="submit"
-                    className="w-full px-4 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Synchroniser les subscribers
-                  </button>
-                </form>
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="w-full px-4 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {syncing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Synchronisation en cours...
+                    </>
+                  ) : (
+                    'Synchroniser les subscribers'
+                  )}
+                </button>
               </div>
 
               {/* Disconnect */}
@@ -175,14 +301,12 @@ export default async function SettingsPage() {
                 <p className="text-gray-600 text-sm mb-4">
                   Cette action supprimera le lien avec ton compte Stripe. Tes donnees importees seront conservees.
                 </p>
-                <form action={disconnectStripe}>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    Deconnecter
-                  </button>
-                </form>
+                <button
+                  onClick={handleDisconnect}
+                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  Deconnecter
+                </button>
               </div>
             </>
           ) : (
@@ -208,7 +332,7 @@ export default async function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center">
                     <span className="text-indigo-600 font-semibold text-sm">3</span>
                   </div>
                   <div>

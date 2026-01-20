@@ -13,30 +13,40 @@ export default async function DashboardPage() {
   // Get user's Stripe connection status and subscriber count
   const { data: userData } = await supabase
     .from('user')
-    .select('stripeaccountid, stripeconnectedat')
+    .select('stripe_account_id, stripe_account_name, stripe_connected, last_sync_at')
     .eq('id', user.id)
     .single();
 
-  const isStripeConnected = !!userData?.stripeaccountid;
+  const isStripeConnected = userData?.stripe_connected === true;
 
-  // Get subscriber count if connected
+  // Get subscriber stats if connected
   let subscriberCount = 0;
   let totalMrr = 0;
+  let atRiskCount = 0;
   if (isStripeConnected) {
     const { count } = await supabase
       .from('subscriber')
       .select('*', { count: 'exact', head: true })
-      .eq('userid', user.id);
+      .eq('user_id', user.id);
 
     subscriberCount = count || 0;
 
     const { data: mrrData } = await supabase
       .from('subscriber')
       .select('mrr')
-      .eq('userid', user.id)
-      .in('status', ['active', 'trialing']);
+      .eq('user_id', user.id)
+      .in('subscription_status', ['active', 'trialing']);
 
     totalMrr = mrrData?.reduce((sum, s) => sum + (s.mrr || 0), 0) || 0;
+
+    // Count at-risk subscribers (past_due or expiring soon)
+    const { count: riskCount } = await supabase
+      .from('subscriber')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('subscription_status', ['past_due', 'unpaid']);
+
+    atRiskCount = riskCount || 0;
   }
 
   async function signOut() {
@@ -74,20 +84,40 @@ export default async function DashboardPage() {
       <main className="max-w-6xl mx-auto px-6 py-12">
         {isStripeConnected ? (
           <>
-            {/* Stats when connected */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-gray-500">Stripe</p>
+            {/* Connected status */}
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
-                <p className="text-2xl font-bold text-green-600">Connecte</p>
+                <div>
+                  <p className="font-semibold text-green-800">
+                    Connecte a {userData?.stripe_account_name || userData?.stripe_account_id}
+                  </p>
+                  {userData?.last_sync_at && (
+                    <p className="text-sm text-green-600">
+                      Derniere synchro: {new Date(userData.last_sync_at).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  )}
+                </div>
               </div>
+              <Link
+                href="/settings"
+                className="px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"
+              >
+                Parametres
+              </Link>
+            </div>
 
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -111,12 +141,36 @@ export default async function DashboardPage() {
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{(totalMrr / 100).toFixed(2)}€</p>
               </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-500">A risque</p>
+                </div>
+                <p className="text-2xl font-bold text-orange-600">{atRiskCount}</p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-500">Agents actifs</p>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">0</p>
+              </div>
             </div>
 
             {/* Actions */}
             <div className="bg-white rounded-2xl border border-gray-200 p-8">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Actions rapides</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Link
                   href="/settings"
                   className="p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
@@ -134,10 +188,22 @@ export default async function DashboardPage() {
                   className="p-6 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors"
                 >
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Voir la demo
+                    Demo V1
                   </h3>
                   <p className="text-gray-600 text-sm">
-                    Explorer toutes les fonctionnalites avec des donnees de demo
+                    Explorer les fonctionnalites classiques
+                  </p>
+                </Link>
+
+                <Link
+                  href="/demo2"
+                  className="p-6 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
+                >
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Demo V2 - AI Agents
+                  </h3>
+                  <p className="text-gray-600 text-sm">
+                    Decouvrir le Revenue Autopilot
                   </p>
                 </Link>
               </div>
@@ -171,17 +237,25 @@ export default async function DashboardPage() {
 
               <div className="p-6 bg-gray-50 rounded-xl">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                  Explorer la demo
+                  Explorer les demos
                 </h2>
                 <p className="text-gray-600 text-sm mb-4">
                   Decouvre toutes les fonctionnalites d&apos;Abo avec des donnees de demonstration.
                 </p>
-                <Link
-                  href="/demo"
-                  className="inline-block px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-                >
-                  Voir la demo
-                </Link>
+                <div className="flex gap-3">
+                  <Link
+                    href="/demo"
+                    className="inline-block px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
+                    Demo V1
+                  </Link>
+                  <Link
+                    href="/demo2"
+                    className="inline-block px-4 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                  >
+                    Demo V2
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
