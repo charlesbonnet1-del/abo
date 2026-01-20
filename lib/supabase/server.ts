@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export async function createClient(): Promise<SupabaseClient | null> {
@@ -38,4 +38,23 @@ export async function getUser() {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   return user;
+}
+
+// Admin client that bypasses RLS - use only for server-side operations
+export function createAdminClient(): SupabaseClient | null {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('Missing SUPABASE_SERVICE_ROLE_KEY for admin client');
+    return null;
+  }
+
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient, getUser } from '@/lib/supabase/server';
+import { createAdminClient, getUser } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
@@ -73,10 +73,10 @@ export async function GET(request: Request) {
       console.error('Failed to fetch Stripe account details:', err);
     }
 
-    // Store Stripe credentials in Supabase
-    const supabase = await createClient();
+    // Store Stripe credentials in Supabase (using admin client to bypass RLS)
+    const supabase = createAdminClient();
     if (!supabase) {
-      console.error('Failed to create Supabase client');
+      console.error('Failed to create Supabase admin client - check SUPABASE_SERVICE_ROLE_KEY');
       return NextResponse.redirect(`${appUrl}/settings?error=database_error`);
     }
 
