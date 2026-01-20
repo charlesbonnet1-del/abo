@@ -211,11 +211,16 @@ export async function POST() {
 
           if (newPriority < currentPriority || customerData.subscription_status === 'none') {
             customerData.subscription_status = sub.status;
-            customerData.current_period_start = sub.current_period_start
-              ? new Date(sub.current_period_start * 1000).toISOString()
+            // Access period dates (they exist but aren't in the type definition for newer API versions)
+            const subWithPeriod = sub as unknown as {
+              current_period_start?: number;
+              current_period_end?: number;
+            };
+            customerData.current_period_start = subWithPeriod.current_period_start
+              ? new Date(subWithPeriod.current_period_start * 1000).toISOString()
               : null;
-            customerData.current_period_end = sub.current_period_end
-              ? new Date(sub.current_period_end * 1000).toISOString()
+            customerData.current_period_end = subWithPeriod.current_period_end
+              ? new Date(subWithPeriod.current_period_end * 1000).toISOString()
               : null;
           }
 
@@ -349,6 +354,11 @@ export async function POST() {
 
       for (const sub of subs) {
         const priceItem = sub.items.data[0];
+        // Access period dates (they exist but aren't in the type definition for newer API versions)
+        const subPeriod = sub as unknown as {
+          current_period_start?: number;
+          current_period_end?: number;
+        };
         const subscriptionData: SubscriptionData = {
           subscriber_id: subscriberId,
           stripe_subscription_id: sub.id,
@@ -356,11 +366,11 @@ export async function POST() {
           plan_name: priceItem?.price?.nickname || priceItem?.price?.id || null,
           plan_amount: priceItem?.price?.unit_amount || 0,
           plan_interval: priceItem?.price?.recurring?.interval || null,
-          current_period_start: sub.current_period_start
-            ? new Date(sub.current_period_start * 1000).toISOString()
+          current_period_start: subPeriod.current_period_start
+            ? new Date(subPeriod.current_period_start * 1000).toISOString()
             : null,
-          current_period_end: sub.current_period_end
-            ? new Date(sub.current_period_end * 1000).toISOString()
+          current_period_end: subPeriod.current_period_end
+            ? new Date(subPeriod.current_period_end * 1000).toISOString()
             : null,
           cancel_at_period_end: sub.cancel_at_period_end,
           canceled_at: sub.canceled_at
