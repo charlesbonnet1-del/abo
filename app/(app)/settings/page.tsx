@@ -113,7 +113,12 @@ export default function SettingsPage() {
       const result = await response.json();
 
       if (response.ok) {
-        setSyncMessage({ type: 'success', text: `${result.synced || 0} subscribers synchronises` });
+        const parts = [];
+        if (result.synced) parts.push(`${result.synced} clients`);
+        if (result.subscriptions) parts.push(`${result.subscriptions} abonnements`);
+        if (result.invoices) parts.push(`${result.invoices} factures`);
+        const text = parts.length > 0 ? parts.join(', ') + ' synchronises' : 'Synchronisation terminee';
+        setSyncMessage({ type: 'success', text });
         await fetchData(); // Refresh data
       } else {
         const errorText = result.details
