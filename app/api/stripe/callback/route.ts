@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appUrl}/login`);
   }
 
+  console.log('Processing Stripe callback for user:', user.id);
+
   try {
     // Exchange code for access token
     const response = await fetch('https://connect.stripe.com/oauth/token', {
@@ -54,6 +56,7 @@ export async function GET(request: Request) {
     }
 
     const { access_token, stripe_user_id } = data;
+    console.log('Got Stripe access token for account:', stripe_user_id);
 
     // Fetch account details to get the display name
     let accountName = stripe_user_id;
@@ -73,24 +76,58 @@ export async function GET(request: Request) {
     // Store Stripe credentials in Supabase
     const supabase = await createClient();
     if (!supabase) {
+      console.error('Failed to create Supabase client');
       return NextResponse.redirect(`${appUrl}/settings?error=database_error`);
     }
 
-    const { error: updateError } = await supabase
+    // First, check if user row exists
+    const { data: existingUser, error: selectError } = await supabase
       .from('user')
-      .update({
-        stripe_account_id: stripe_user_id,
-        stripe_account_name: accountName,
-        stripe_connected: true,
-        stripe_access_token: access_token,
-        last_sync_at: null, // Will be set after first sync
-      })
-      .eq('id', user.id);
+      .select('id')
+      .eq('id', user.id)
+      .single();
 
-    if (updateError) {
-      console.error('Failed to save Stripe credentials:', updateError);
-      return NextResponse.redirect(`${appUrl}/settings?error=save_failed`);
+    console.log('Existing user check:', existingUser, 'Error:', selectError);
+
+    let saveError;
+
+    if (existingUser) {
+      // User exists, update
+      const { error } = await supabase
+        .from('user')
+        .update({
+          stripe_account_id: stripe_user_id,
+          stripe_account_name: accountName,
+          stripe_connected: true,
+          stripe_access_token: access_token,
+          last_sync_at: null,
+        })
+        .eq('id', user.id);
+      saveError = error;
+      console.log('Update result - Error:', error);
+    } else {
+      // User doesn't exist, insert
+      const { error } = await supabase
+        .from('user')
+        .insert({
+          id: user.id,
+          email: user.email,
+          stripe_account_id: stripe_user_id,
+          stripe_account_name: accountName,
+          stripe_connected: true,
+          stripe_access_token: access_token,
+          last_sync_at: null,
+        });
+      saveError = error;
+      console.log('Insert result - Error:', error);
     }
+
+    if (saveError) {
+      console.error('Failed to save Stripe credentials:', saveError);
+      return NextResponse.redirect(`${appUrl}/settings?error=save_failed_${saveError.code}`);
+    }
+
+    console.log('Stripe credentials saved successfully');
 
     // Redirect to settings with success flag and auto_sync parameter
     return NextResponse.redirect(`${appUrl}/settings?success=true&auto_sync=true`);
