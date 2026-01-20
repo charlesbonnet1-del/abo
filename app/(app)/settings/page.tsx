@@ -21,24 +21,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Get URL params
-  const [urlParams, setUrlParams] = useState<{ success?: string; error?: string; auto_sync?: string }>({});
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      setUrlParams({
-        success: params.get('success') || undefined,
-        error: params.get('error') || undefined,
-        auto_sync: params.get('auto_sync') || undefined,
-      });
-      // Clean URL after reading params
-      if (params.toString()) {
-        window.history.replaceState({}, '', '/settings');
-      }
-    }
-  }, []);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showError, setShowError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -55,37 +39,69 @@ export default function SettingsPage() {
     setUser({ id: authUser.id, email: authUser.email || '' });
 
     // Get user's Stripe connection status
-    const { data: userDataResult } = await supabase
+    const { data: userDataResult, error } = await supabase
       .from('user')
       .select('stripe_account_id, stripe_account_name, stripe_connected, last_sync_at')
       .eq('id', authUser.id)
       .single();
 
-    setUserData(userDataResult);
+    console.log('Fetched user data:', userDataResult, 'Error:', error);
 
-    // Get subscriber count if connected
-    if (userDataResult?.stripe_connected) {
-      const { count } = await supabase
-        .from('subscriber')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', authUser.id);
-      setSubscriberCount(count || 0);
+    if (userDataResult) {
+      setUserData(userDataResult);
+
+      // Get subscriber count if connected
+      if (userDataResult.stripe_connected) {
+        const { count } = await supabase
+          .from('subscriber')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+        setSubscriberCount(count || 0);
+      }
     }
 
     setLoading(false);
   }, [router]);
 
+  // Initial load and URL params handling
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    // Check URL params first
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const success = params.get('success');
+      const error = params.get('error');
+      const autoSync = params.get('auto_sync');
 
-  // Auto-sync after connection
-  useEffect(() => {
-    if (urlParams.auto_sync === 'true' && userData?.stripe_connected && !syncing) {
-      handleSync();
+      if (success) {
+        setShowSuccess(true);
+      }
+      if (error) {
+        setShowError(error);
+      }
+
+      // Clean URL
+      if (params.toString()) {
+        window.history.replaceState({}, '', '/settings');
+      }
+
+      // Fetch data - if success param is present, wait a bit for DB to be updated
+      if (success) {
+        // Small delay to ensure DB has been updated by callback
+        setTimeout(() => {
+          fetchData();
+          if (autoSync === 'true') {
+            // Trigger auto-sync after a short delay
+            setTimeout(() => handleSync(), 500);
+          }
+        }, 300);
+      } else {
+        fetchData();
+      }
+    } else {
+      fetchData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlParams.auto_sync, userData?.stripe_connected]);
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -123,14 +139,16 @@ export default function SettingsPage() {
         stripe_access_token: null,
         last_sync_at: null,
       })
-      .eq('id', user?.id);
+      .eq('id', user.id);
 
     setUserData(null);
     setSubscriberCount(0);
+    setShowSuccess(false);
     router.refresh();
   };
 
-  const isConnected = userData?.stripe_connected === true;
+  // Check connection status - use stripe_connected OR stripe_account_id as fallback
+  const isConnected = userData?.stripe_connected === true || !!userData?.stripe_account_id;
   const stripeConnectUrl = getStripeConnectUrl();
 
   const formatDate = (dateStr: string | null) => {
@@ -178,7 +196,7 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Parametres</h1>
 
         {/* Success message */}
-        {urlParams.success && (
+        {showSuccess && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
             <div className="flex items-center gap-2">
               <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,13 +208,13 @@ export default function SettingsPage() {
         )}
 
         {/* Error message */}
-        {urlParams.error && (
+        {showError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
             <div className="flex items-center gap-2">
               <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              <p className="text-red-800 font-medium">Erreur: {urlParams.error}</p>
+              <p className="text-red-800 font-medium">Erreur: {showError}</p>
             </div>
           </div>
         )}
@@ -240,7 +258,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-green-800">
-                      Connecte a {userData?.stripe_account_name || userData?.stripe_account_id}
+                      Connecte a {userData?.stripe_account_name || userData?.stripe_account_id || 'Stripe'}
                     </p>
                     {userData?.last_sync_at && (
                       <p className="text-sm text-green-600">
@@ -359,6 +377,15 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+
+        {/* Debug info - remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-xl text-xs font-mono">
+            <p>Debug: stripe_connected = {String(userData?.stripe_connected)}</p>
+            <p>Debug: stripe_account_id = {userData?.stripe_account_id || 'null'}</p>
+            <p>Debug: isConnected = {String(isConnected)}</p>
+          </div>
+        )}
       </main>
     </div>
   );
