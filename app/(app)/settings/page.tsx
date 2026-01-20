@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getStripeConnectUrl } from '@/lib/stripe';
 
 interface UserData {
   stripe_account_id: string | null;
@@ -149,7 +148,6 @@ export default function SettingsPage() {
 
   // Check connection status - use stripe_connected OR stripe_account_id as fallback
   const isConnected = userData?.stripe_connected === true || !!userData?.stripe_account_id;
-  const stripeConnectUrl = getStripeConnectUrl();
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -361,7 +359,7 @@ export default function SettingsPage() {
               </div>
 
               <a
-                href={stripeConnectUrl}
+                href="/api/stripe/connect"
                 className="flex items-center justify-center gap-2 w-full px-6 py-3 text-white bg-[#635BFF] rounded-lg font-medium hover:bg-[#5851ea] transition-colors"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">

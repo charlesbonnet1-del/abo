@@ -23,7 +23,8 @@ export const stripe = {
   },
 };
 
-export const STRIPE_CLIENT_ID = process.env.STRIPE_CLIENT_ID || '';
+// Use NEXT_PUBLIC_ prefix for client-side access
+export const STRIPE_CLIENT_ID = process.env.NEXT_PUBLIC_STRIPE_CLIENT_ID || process.env.STRIPE_CLIENT_ID || '';
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export function getStripeConnectUrl(state?: string): string {
