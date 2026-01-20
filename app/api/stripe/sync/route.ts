@@ -90,7 +90,7 @@ export async function POST() {
     let startingAfter: string | undefined;
 
     while (hasMore) {
-      const customers = await stripe.customers.list({
+      const customers: Stripe.ApiList<Stripe.Customer> = await stripe.customers.list({
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       });
@@ -138,7 +138,7 @@ export async function POST() {
     startingAfter = undefined;
 
     while (hasMore) {
-      const subscriptions = await stripe.subscriptions.list({
+      const subscriptions: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
         status: 'all',
         expand: ['data.items.data.price', 'data.default_payment_method'],
         limit: 100,
@@ -239,7 +239,7 @@ export async function POST() {
     startingAfter = undefined;
 
     while (hasMore) {
-      const invoices = await stripe.invoices.list({
+      const invoices: Stripe.ApiList<Stripe.Invoice> = await stripe.invoices.list({
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       });
