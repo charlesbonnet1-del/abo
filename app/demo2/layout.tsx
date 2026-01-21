@@ -2,6 +2,7 @@
 
 import { NavigationDemo2 } from '@/components/nav-demo2';
 import { UserMenu } from '@/components/user-menu';
+import { useAgentInit } from '@/lib/hooks/useAgentInit';
 
 // Mock user for demo purposes
 const mockCurrentUser = {
@@ -14,6 +15,9 @@ export default function Demo2Layout({
 }: {
   children: React.ReactNode;
 }) {
+  // Initialize agent configs for new users
+  useAgentInit();
+
   return (
     <div className="min-h-screen bg-slate-50">
       <NavigationDemo2 />
