@@ -355,11 +355,11 @@ async function handleSubscriptionUpsert(
       plan_name: priceItem?.price?.nickname || priceItem?.price?.id || null,
       plan_amount: priceItem?.price?.unit_amount || 0,
       plan_interval: priceItem?.price?.recurring?.interval || null,
-      current_period_start: subscription.current_period_start
-        ? new Date(subscription.current_period_start * 1000).toISOString()
+      current_period_start: (subscription as unknown as { current_period_start?: number }).current_period_start
+        ? new Date((subscription as unknown as { current_period_start: number }).current_period_start * 1000).toISOString()
         : null,
-      current_period_end: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
+      current_period_end: (subscription as unknown as { current_period_end?: number }).current_period_end
+        ? new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000).toISOString()
         : null,
       cancel_at_period_end: subscription.cancel_at_period_end,
       canceled_at: subscription.canceled_at
