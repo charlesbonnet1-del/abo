@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { StatusBadge, AgentIcon, TimeAgo, formatDate, formatDateTime } from '@/components/ui';
+import { StatusBadge, AgentIcon, formatDate, formatDateTime } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 
 interface Subscriber {
