@@ -301,7 +301,7 @@ export async function POST() {
     let syncedSubscribers = 0;
     const subscriberIdMap = new Map<string, string>(); // stripe_customer_id -> subscriber.id
 
-    for (const [stripeCustomerId, subscriberData] of customerMap) {
+    for (const [stripeCustomerId, subscriberData] of Array.from(customerMap.entries())) {
       // First try to find existing subscriber
       const { data: existing } = await supabase
         .from('subscriber')
@@ -348,7 +348,7 @@ export async function POST() {
     console.log('Upserting subscriptions...');
     let syncedSubscriptions = 0;
 
-    for (const [stripeCustomerId, subs] of subscriptionsByCustomer) {
+    for (const [stripeCustomerId, subs] of Array.from(subscriptionsByCustomer.entries())) {
       const subscriberId = subscriberIdMap.get(stripeCustomerId);
       if (!subscriberId) continue;
 
@@ -401,7 +401,7 @@ export async function POST() {
     console.log('Upserting invoices...');
     let syncedInvoices = 0;
 
-    for (const [stripeCustomerId, invs] of invoicesByCustomer) {
+    for (const [stripeCustomerId, invs] of Array.from(invoicesByCustomer.entries())) {
       const subscriberId = subscriberIdMap.get(stripeCustomerId);
       if (!subscriberId) continue;
 
