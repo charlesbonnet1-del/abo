@@ -46,7 +46,27 @@ CREATE TABLE IF NOT EXISTS public.conversion_opportunity (
 );
 
 -- =============================================
--- PART B: AGENT_CONFIG ADDITIONS
+-- PART B: BRAND_SETTINGS ADDITIONS (New Brand Lab)
+-- =============================================
+
+-- Add new Brand Lab columns to brand_settings
+ALTER TABLE public.brand_settings
+ADD COLUMN IF NOT EXISTS product_type TEXT DEFAULT 'saas',
+ADD COLUMN IF NOT EXISTS product_description TEXT,
+ADD COLUMN IF NOT EXISTS industry TEXT,
+ADD COLUMN IF NOT EXISTS target_audience TEXT DEFAULT 'pme',
+ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]',
+ADD COLUMN IF NOT EXISTS aha_moment_known BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS aha_moment_description TEXT,
+ADD COLUMN IF NOT EXISTS plans_metadata JSONB DEFAULT '{}',
+ADD COLUMN IF NOT EXISTS objectives JSONB DEFAULT '[]',
+ADD COLUMN IF NOT EXISTS segmentation_enabled BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS segments JSONB DEFAULT '[]',
+ADD COLUMN IF NOT EXISTS segment_by_ltv JSONB DEFAULT '{"bronze": {"max": 500}, "silver": {"min": 500, "max": 2000}, "gold": {"min": 2000}}',
+ADD COLUMN IF NOT EXISTS segment_by_plan JSONB DEFAULT '{}';
+
+-- =============================================
+-- PART C: AGENT_CONFIG ADDITIONS (New Agent Config)
 -- =============================================
 
 -- Add agent-specific configuration columns to agent_config
@@ -54,10 +74,44 @@ ALTER TABLE public.agent_config
 ADD COLUMN IF NOT EXISTS recovery_delays INTEGER[] DEFAULT '{0, 1, 3, 7}',
 ADD COLUMN IF NOT EXISTS trial_warning_days INTEGER DEFAULT 3,
 ADD COLUMN IF NOT EXISTS freemium_conversion_days INTEGER DEFAULT 7,
-ADD COLUMN IF NOT EXISTS churn_risk_threshold INTEGER DEFAULT 70;
+ADD COLUMN IF NOT EXISTS churn_risk_threshold INTEGER DEFAULT 70,
+-- Strategy & Template
+ADD COLUMN IF NOT EXISTS strategy_template TEXT DEFAULT 'moderate',
+ADD COLUMN IF NOT EXISTS strategy_config JSONB DEFAULT '{}',
+-- Recovery specific
+ADD COLUMN IF NOT EXISTS recovery_sequence JSONB DEFAULT '[
+  {"step": 1, "delay_days": 0, "tone": "friendly", "channel": "email"},
+  {"step": 2, "delay_days": 1, "tone": "informative", "channel": "email"},
+  {"step": 3, "delay_days": 3, "tone": "urgent", "channel": "email", "include_offer": true},
+  {"step": 4, "delay_days": 7, "tone": "final", "channel": "email", "mention_suspension": true}
+]',
+ADD COLUMN IF NOT EXISTS recovery_escalation JSONB,
+ADD COLUMN IF NOT EXISTS recovery_exclusions JSONB,
+-- Retention specific
+ADD COLUMN IF NOT EXISTS retention_triggers JSONB DEFAULT '["cancel_pending", "downgrade"]',
+ADD COLUMN IF NOT EXISTS retention_approach TEXT DEFAULT 'winback',
+ADD COLUMN IF NOT EXISTS retention_ask_reason BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS retention_custom_rules TEXT,
+-- Conversion specific
+ADD COLUMN IF NOT EXISTS conversion_triggers JSONB DEFAULT '["trial_ending", "freemium_inactive"]',
+ADD COLUMN IF NOT EXISTS conversion_sequence JSONB,
+ADD COLUMN IF NOT EXISTS conversion_by_usage JSONB,
+-- Offers config
+ADD COLUMN IF NOT EXISTS offers_config JSONB DEFAULT '{}',
+-- Limits config
+ADD COLUMN IF NOT EXISTS limits_config JSONB DEFAULT '{
+  "max_budget_month": null,
+  "max_actions_day": 50,
+  "max_emails_client_week": 3,
+  "max_offers_client_year": 4,
+  "send_hours_start": 9,
+  "send_hours_end": 19,
+  "timezone": "Europe/Paris",
+  "no_weekend": false
+}';
 
 -- =============================================
--- PART C: ROW LEVEL SECURITY (RLS)
+-- PART D: ROW LEVEL SECURITY (RLS)
 -- =============================================
 
 -- Enable RLS on new tables
@@ -117,7 +171,7 @@ CREATE POLICY "Users can delete own conversion opportunities"
   USING (auth.uid() = user_id);
 
 -- =============================================
--- PART D: INDEXES
+-- PART E: INDEXES
 -- =============================================
 
 -- Recovery sequence indexes
