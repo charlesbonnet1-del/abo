@@ -7,9 +7,17 @@ export const dynamic = 'force-dynamic';
 // Disable body parsing - we need raw body for signature verification
 export const runtime = 'nodejs';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-12-15.clover',
-});
+// Lazy initialization for Stripe
+let stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2025-12-15.clover',
+    });
+  }
+  return stripe;
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -28,7 +36,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET
