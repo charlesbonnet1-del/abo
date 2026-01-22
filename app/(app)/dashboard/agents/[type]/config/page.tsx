@@ -20,6 +20,13 @@ interface AgentConfigData {
   is_active: boolean;
   confidence_level: ConfidenceLevel;
   notification_channels: NotificationChannel[];
+  // Recovery-specific settings
+  recovery_delays?: number[];
+  // Conversion-specific settings
+  trial_warning_days?: number;
+  freemium_conversion_days?: number;
+  // Retention-specific settings
+  churn_risk_threshold?: number;
 }
 
 interface ActionRule {
@@ -88,6 +95,13 @@ export default function AgentConfigPage({ params }: { params: Promise<{ type: st
     is_active: false,
     confidence_level: 'review_all',
     notification_channels: ['app'],
+    // Recovery defaults
+    recovery_delays: [0, 1, 3, 7],
+    // Conversion defaults
+    trial_warning_days: 3,
+    freemium_conversion_days: 7,
+    // Retention defaults
+    churn_risk_threshold: 70,
   });
 
   const [rules, setRules] = useState<ActionRule[]>([]);
@@ -129,6 +143,10 @@ export default function AgentConfigPage({ params }: { params: Promise<{ type: st
         setConfig({
           ...configData,
           notification_channels: configData.notification_channels || ['app'],
+          recovery_delays: configData.recovery_delays || [0, 1, 3, 7],
+          trial_warning_days: configData.trial_warning_days || 3,
+          freemium_conversion_days: configData.freemium_conversion_days || 7,
+          churn_risk_threshold: configData.churn_risk_threshold || 70,
         });
 
         // Load action rules
@@ -213,6 +231,11 @@ export default function AgentConfigPage({ params }: { params: Promise<{ type: st
         is_active: config.is_active,
         confidence_level: config.confidence_level,
         notification_channels: config.notification_channels,
+        // Agent-specific settings
+        recovery_delays: config.recovery_delays,
+        trial_warning_days: config.trial_warning_days,
+        freemium_conversion_days: config.freemium_conversion_days,
+        churn_risk_threshold: config.churn_risk_threshold,
         updated_at: new Date().toISOString(),
       };
 
@@ -378,6 +401,122 @@ export default function AgentConfigPage({ params }: { params: Promise<{ type: st
             </div>
           </CardContent>
         </Card>
+
+        {/* Agent-specific settings */}
+        {agentType === 'recovery' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sequence de relance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500 mb-4">
+                Configure les delais entre chaque email de relance apres un paiement echoue
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {(config.recovery_delays || [0, 1, 3, 7]).map((delay, index) => (
+                  <div key={index} className="p-3 border border-gray-200 rounded-lg">
+                    <div className="text-xs text-gray-500 mb-1">Email {index + 1}</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={delay}
+                        onChange={(e) => {
+                          const newDelays = [...(config.recovery_delays || [0, 1, 3, 7])];
+                          newDelays[index] = parseInt(e.target.value) || 0;
+                          updateConfig('recovery_delays', newDelays);
+                        }}
+                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      />
+                      <span className="text-sm text-gray-500">jour{delay > 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                0 = immediat, 1 = 1 jour apres l&apos;echec, etc.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {agentType === 'conversion' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Parametres de conversion</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alerte fin de periode d&apos;essai
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="14"
+                    value={config.trial_warning_days || 3}
+                    onChange={(e) => updateConfig('trial_warning_days', parseInt(e.target.value) || 3)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-sm text-gray-500">jours avant expiration du trial</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  L&apos;agent enverra un email X jours avant la fin de la periode d&apos;essai
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Relance utilisateurs freemium
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={config.freemium_conversion_days || 7}
+                    onChange={(e) => updateConfig('freemium_conversion_days', parseInt(e.target.value) || 7)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-sm text-gray-500">jours apres inscription</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Envoyer une proposition d&apos;upgrade aux utilisateurs freemium apres X jours
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {agentType === 'retention' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Parametres de retention</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Seuil de risque de churn
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={config.churn_risk_threshold || 70}
+                    onChange={(e) => updateConfig('churn_risk_threshold', parseInt(e.target.value) || 70)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-sm text-gray-500">% de probabilite</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  L&apos;agent interviendra quand le risque de churn depasse ce seuil
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Niveau de confiance */}
         <Card>
