@@ -46,14 +46,15 @@ CREATE TABLE IF NOT EXISTS public.conversion_opportunity (
 );
 
 -- =============================================
--- PART B: BRAND_SETTINGS ADDITIONS
+-- PART B: AGENT_CONFIG ADDITIONS
 -- =============================================
 
--- Add agent configuration columns to brand_settings
-ALTER TABLE public.brand_settings
+-- Add agent-specific configuration columns to agent_config
+ALTER TABLE public.agent_config
 ADD COLUMN IF NOT EXISTS recovery_delays INTEGER[] DEFAULT '{0, 1, 3, 7}',
+ADD COLUMN IF NOT EXISTS trial_warning_days INTEGER DEFAULT 3,
 ADD COLUMN IF NOT EXISTS freemium_conversion_days INTEGER DEFAULT 7,
-ADD COLUMN IF NOT EXISTS trial_warning_days INTEGER DEFAULT 3;
+ADD COLUMN IF NOT EXISTS churn_risk_threshold INTEGER DEFAULT 70;
 
 -- =============================================
 -- PART C: ROW LEVEL SECURITY (RLS)
