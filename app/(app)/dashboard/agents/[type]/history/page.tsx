@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -122,9 +122,10 @@ function groupActionsByDate(actions: AgentAction[]): { label: string; actions: A
   return Object.entries(groups).map(([label, actions]) => ({ label, actions }));
 }
 
-export default function AgentHistoryPage({ params }: { params: Promise<{ type: string }> }) {
-  const { type } = use(params);
+export default function AgentHistoryPage() {
+  const params = useParams();
   const router = useRouter();
+  const type = params.type as string;
   const agentType = type as AgentType;
 
   const [actions, setActions] = useState<AgentAction[]>([]);

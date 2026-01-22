@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -85,9 +85,10 @@ const notificationChannels: { value: NotificationChannel; label: string; availab
   { value: 'whatsapp', label: 'WhatsApp', available: false },
 ];
 
-export default function AgentConfigPage({ params }: { params: Promise<{ type: string }> }) {
-  const { type } = use(params);
+export default function AgentConfigPage() {
+  const params = useParams();
   const router = useRouter();
+  const type = params.type as string;
   const agentType = type as AgentType;
 
   const [config, setConfig] = useState<AgentConfigData>({
