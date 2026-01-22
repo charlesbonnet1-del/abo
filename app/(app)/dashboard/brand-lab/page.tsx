@@ -21,6 +21,10 @@ interface BrandSettings {
   always_mention: string[];
   example_emails: string[];
   signature: string;
+  // Agent configuration
+  recovery_delays: number[];
+  trial_warning_days: number;
+  freemium_conversion_days: number;
 }
 
 const defaultSettings: BrandSettings = {
@@ -33,6 +37,10 @@ const defaultSettings: BrandSettings = {
   always_mention: [],
   example_emails: [],
   signature: 'Cordialement,\nL\'équipe {company_name}',
+  // Agent configuration defaults
+  recovery_delays: [0, 1, 3, 7],
+  trial_warning_days: 3,
+  freemium_conversion_days: 7,
 };
 
 const languages = [
@@ -82,6 +90,9 @@ export default function BrandLabPage() {
           never_say: data.never_say || [],
           always_mention: data.always_mention || [],
           example_emails: data.example_emails || [],
+          recovery_delays: data.recovery_delays || [0, 1, 3, 7],
+          trial_warning_days: data.trial_warning_days || 3,
+          freemium_conversion_days: data.freemium_conversion_days || 7,
         });
       }
     } catch (err) {
@@ -127,6 +138,9 @@ export default function BrandLabPage() {
         always_mention: settings.always_mention,
         example_emails: settings.example_emails,
         signature: settings.signature,
+        recovery_delays: settings.recovery_delays,
+        trial_warning_days: settings.trial_warning_days,
+        freemium_conversion_days: settings.freemium_conversion_days,
         updated_at: new Date().toISOString(),
       };
 
@@ -315,6 +329,80 @@ L'équipe {company_name}"
             <p className="text-xs text-gray-500 mt-2">
               Utilise {'{company_name}'} pour insérer automatiquement le nom de ton entreprise
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Configuration des agents */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuration des agents</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Recovery delays */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Recovery Agent - Delais de relance (jours apres echec)
+              </label>
+              <div className="grid grid-cols-4 gap-3">
+                {settings.recovery_delays.map((delay, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Etape {index + 1}:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      value={delay}
+                      onChange={(e) => {
+                        const newDelays = [...settings.recovery_delays];
+                        newDelays[index] = parseInt(e.target.value) || 0;
+                        updateSettings('recovery_delays', newDelays);
+                      }}
+                      className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    />
+                    <span className="text-xs text-gray-500">j</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Exemple: 0 = immediat, 1 = 1 jour apres, etc.
+              </p>
+            </div>
+
+            {/* Conversion Agent settings */}
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alerte fin de trial
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="14"
+                    value={settings.trial_warning_days}
+                    onChange={(e) => updateSettings('trial_warning_days', parseInt(e.target.value) || 3)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-sm text-gray-500">jours avant expiration</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Relance freemium apres
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={settings.freemium_conversion_days}
+                    onChange={(e) => updateSettings('freemium_conversion_days', parseInt(e.target.value) || 7)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-sm text-gray-500">jours d&apos;inactivite</span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -287,7 +287,7 @@ export default function DashboardPage() {
                 {data.pendingActions.length} action{data.pendingActions.length > 1 ? 's' : ''} en attente
               </span>
             </div>
-            <Link href="/dashboard/history?status=pending_approval" className="text-sm font-medium text-amber-700 hover:text-amber-900">
+            <Link href="/dashboard/approvals" className="text-sm font-medium text-amber-700 hover:text-amber-900">
               Voir tout
             </Link>
           </div>
