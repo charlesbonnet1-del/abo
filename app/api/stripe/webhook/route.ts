@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 import { createOrchestrator } from '@/lib/agents/agents';
+import {
+  detectRecoverySuccess,
+  detectRetentionSuccess,
+  detectConversionSuccess,
+  detectFailure,
+} from '@/lib/agents/helpers/outcome-detector';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,13 +127,28 @@ export async function POST(request: NextRequest) {
           ? subscription.customer
           : subscription.customer.id;
 
-        // Get subscriber ID
+        // Get subscriber ID and previous status for outcome detection
         const { data: subscriber } = await supabase
           .from('subscriber')
-          .select('id')
+          .select('id, subscription_status')
           .eq('user_id', userId)
           .eq('stripe_customer_id', customerId)
           .single();
+
+        // Check previous subscription state for cancel_at
+        let wasGoingToCancel = false;
+        if (subscriber && event.type === 'customer.subscription.updated') {
+          const { data: existingSub } = await supabase
+            .from('subscription')
+            .select('cancel_at_period_end')
+            .eq('subscriber_id', subscriber.id)
+            .eq('stripe_subscription_id', subscription.id)
+            .single();
+
+          wasGoingToCancel = existingSub?.cancel_at_period_end === true;
+        }
+
+        const previousStatus = subscriber?.subscription_status;
 
         if (!subscriber) {
           console.log('Subscriber not found, creating from subscription event');
@@ -150,6 +171,29 @@ export async function POST(request: NextRequest) {
         } else {
           await handleSubscriptionUpsert(supabase, subscriber.id, subscription);
           await recalculateSubscriberMRR(supabase, subscriber.id);
+
+          // Detect outcomes for learning
+          try {
+            // Retention success: cancellation was reversed
+            if (wasGoingToCancel && !subscription.cancel_at_period_end) {
+              await detectRetentionSuccess(userId, subscriber.id, subscription.id, {
+                wasGoingToCancel: true,
+                newStatus: subscription.status,
+              });
+            }
+
+            // Conversion success: trial converted to active
+            if (previousStatus === 'trialing' && subscription.status === 'active') {
+              const priceItem = subscription.items.data[0];
+              await detectConversionSuccess(userId, subscriber.id, subscription.id, {
+                previousStatus: 'trialing',
+                newPlan: priceItem?.price?.nickname || priceItem?.price?.id,
+                mrr: priceItem?.price?.unit_amount || 0,
+              });
+            }
+          } catch (outcomeError) {
+            console.error('Error detecting subscription outcome:', outcomeError);
+          }
         }
         break;
       }
@@ -164,12 +208,14 @@ export async function POST(request: NextRequest) {
 
         const { data: subscriber } = await supabase
           .from('subscriber')
-          .select('id')
+          .select('id, subscription_status')
           .eq('user_id', userId)
           .eq('stripe_customer_id', customerId)
           .single();
 
         if (subscriber) {
+          const previousStatus = subscriber.subscription_status;
+
           // Update subscription status to canceled
           await supabase
             .from('subscription')
@@ -181,6 +227,27 @@ export async function POST(request: NextRequest) {
             .eq('stripe_subscription_id', subscription.id);
 
           await recalculateSubscriberMRR(supabase, subscriber.id);
+
+          // Detect failure outcomes for learning
+          try {
+            // Retention failure: active subscription was canceled
+            if (previousStatus === 'active') {
+              await detectFailure(userId, subscriber.id, 'retention', {
+                subscription_id: subscription.id,
+                cancellation_reason: subscription.cancellation_details?.reason || 'unknown',
+              });
+            }
+
+            // Conversion failure: trial expired without converting
+            if (previousStatus === 'trialing') {
+              await detectFailure(userId, subscriber.id, 'conversion', {
+                subscription_id: subscription.id,
+                trial_expired: true,
+              });
+            }
+          } catch (outcomeError) {
+            console.error('Error detecting cancellation outcome:', outcomeError);
+          }
         }
         break;
       }
@@ -200,7 +267,7 @@ export async function POST(request: NextRequest) {
 
         const { data: subscriber } = await supabase
           .from('subscriber')
-          .select('id, lifetime_value')
+          .select('id, lifetime_value, last_payment_status')
           .eq('user_id', userId)
           .eq('stripe_customer_id', customerId)
           .single();
@@ -234,6 +301,20 @@ export async function POST(request: NextRequest) {
             .eq('id', subscriber.id);
 
           console.log(`Invoice paid: ${invoice.id}, amount: ${invoice.amount_paid}`);
+
+          // Detect recovery success - check if there was a recent payment failure
+          if (subscriber.last_payment_status === 'failed') {
+            try {
+              await detectRecoverySuccess(
+                userId,
+                subscriber.id,
+                invoice.id,
+                invoice.amount_paid || 0
+              );
+            } catch (outcomeError) {
+              console.error('Error detecting recovery outcome:', outcomeError);
+            }
+          }
         }
         break;
       }
