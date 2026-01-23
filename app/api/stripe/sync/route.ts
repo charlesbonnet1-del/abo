@@ -17,6 +17,7 @@ interface SubscriberData {
   plan_interval: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
+  trial_end: string | null;
   payment_method_type: string | null;
   payment_method_last4: string | null;
   currency: string;
@@ -83,6 +84,7 @@ export async function POST() {
     const customerMap = new Map<string, SubscriberData>();
     const subscriptionsByCustomer = new Map<string, Stripe.Subscription[]>();
     const invoicesByCustomer = new Map<string, Stripe.Invoice[]>();
+    const productCache = new Map<string, string>(); // productId -> product.name
 
     // =====================
     // 1. FETCH ALL CUSTOMERS
@@ -114,6 +116,7 @@ export async function POST() {
           plan_interval: null,
           current_period_start: null,
           current_period_end: null,
+          trial_end: null,
           payment_method_type: null,
           payment_method_last4: null,
           currency: 'eur',
@@ -144,7 +147,7 @@ export async function POST() {
     while (hasMore) {
       const subscriptions: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
         status: 'all',
-        expand: ['data.items.data.price', 'data.default_payment_method'],
+        expand: ['data.items.data.price', 'data.items.data.price.product', 'data.default_payment_method'],
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       }, {
@@ -173,32 +176,41 @@ export async function POST() {
             }
           }
 
-          // Calculate MRR (only for active/trialing subscriptions)
-          if (sub.status === 'active' || sub.status === 'trialing') {
-            const priceItem = sub.items.data[0];
-            if (priceItem?.price) {
-              const amount = priceItem.price.unit_amount || 0;
-              const interval = priceItem.price.recurring?.interval;
+          // Get price and product info
+          const priceItem = sub.items.data[0];
+          const price = priceItem?.price;
+          const interval = price?.recurring?.interval;
+          const amount = price?.unit_amount || 0;
 
-              let monthlyAmount = 0;
-              if (interval === 'year') {
-                monthlyAmount = Math.round(amount / 12);
-              } else if (interval === 'month') {
-                monthlyAmount = amount;
-              } else if (interval === 'week') {
-                monthlyAmount = amount * 4;
-              } else if (interval === 'day') {
-                monthlyAmount = amount * 30;
-              }
-              customerData.mrr += monthlyAmount;
-
-              // Set plan info from most recent active subscription
-              if (!customerData.plan_name || sub.status === 'active') {
-                customerData.plan_name = priceItem.price.nickname || priceItem.price.id;
-                customerData.plan_interval = interval || null;
-              }
+          // Get product name (from expanded product or cache)
+          let productName: string | null = null;
+          if (price?.product) {
+            if (typeof price.product === 'string') {
+              // Product not expanded, check cache or fetch later
+              productName = productCache.get(price.product) || null;
+            } else {
+              // Product is expanded
+              const product = price.product as Stripe.Product;
+              productName = product.name;
+              productCache.set(product.id, product.name);
             }
           }
+
+          // Calculate MRR (only for active subscriptions, NOT trialing)
+          if (sub.status === 'active') {
+            let monthlyAmount = 0;
+            if (interval === 'year') {
+              monthlyAmount = Math.round(amount / 12);
+            } else if (interval === 'month') {
+              monthlyAmount = amount;
+            } else if (interval === 'week') {
+              monthlyAmount = amount * 4;
+            } else if (interval === 'day') {
+              monthlyAmount = amount * 30;
+            }
+            customerData.mrr += monthlyAmount;
+          }
+          // MRR stays 0 for trialing subscriptions
 
           // Set subscription status (prioritize active > trialing > others)
           const statusPriority: Record<string, number> = {
@@ -217,17 +229,27 @@ export async function POST() {
 
           if (newPriority < currentPriority || customerData.subscription_status === 'none') {
             customerData.subscription_status = sub.status;
-            // Access period dates (they exist but aren't in the type definition for newer API versions)
-            const subWithPeriod = sub as unknown as {
+
+            // Access period dates and trial_end
+            const subExtended = sub as unknown as {
               current_period_start?: number;
               current_period_end?: number;
+              trial_end?: number | null;
             };
-            customerData.current_period_start = subWithPeriod.current_period_start
-              ? new Date(subWithPeriod.current_period_start * 1000).toISOString()
+
+            customerData.current_period_start = subExtended.current_period_start
+              ? new Date(subExtended.current_period_start * 1000).toISOString()
               : null;
-            customerData.current_period_end = subWithPeriod.current_period_end
-              ? new Date(subWithPeriod.current_period_end * 1000).toISOString()
+            customerData.current_period_end = subExtended.current_period_end
+              ? new Date(subExtended.current_period_end * 1000).toISOString()
               : null;
+            customerData.trial_end = subExtended.trial_end
+              ? new Date(subExtended.trial_end * 1000).toISOString()
+              : null;
+
+            // Set plan info (prefer product name over price nickname)
+            customerData.plan_name = productName || price?.nickname || price?.id || null;
+            customerData.plan_interval = interval || null;
           }
 
           customerData.currency = sub.currency || customerData.currency;
@@ -362,6 +384,19 @@ export async function POST() {
 
       for (const sub of subs) {
         const priceItem = sub.items.data[0];
+        const price = priceItem?.price;
+
+        // Get product name from cache or expanded product
+        let productName: string | null = null;
+        if (price?.product) {
+          if (typeof price.product === 'string') {
+            productName = productCache.get(price.product) || null;
+          } else {
+            const product = price.product as Stripe.Product;
+            productName = product.name;
+          }
+        }
+
         // Access period dates (they exist but aren't in the type definition for newer API versions)
         const subPeriod = sub as unknown as {
           current_period_start?: number;
@@ -371,9 +406,9 @@ export async function POST() {
           subscriber_id: subscriberId,
           stripe_subscription_id: sub.id,
           status: sub.status,
-          plan_name: priceItem?.price?.nickname || priceItem?.price?.id || null,
-          plan_amount: priceItem?.price?.unit_amount || 0,
-          plan_interval: priceItem?.price?.recurring?.interval || null,
+          plan_name: productName || price?.nickname || price?.id || null,
+          plan_amount: price?.unit_amount || 0,
+          plan_interval: price?.recurring?.interval || null,
           current_period_start: subPeriod.current_period_start
             ? new Date(subPeriod.current_period_start * 1000).toISOString()
             : null,
