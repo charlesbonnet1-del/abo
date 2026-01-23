@@ -46,7 +46,8 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/signup') ||
       pathname.startsWith('/auth') ||
       pathname.startsWith('/demo') ||
-      pathname.startsWith('/api/stripe/webhooks');
+      pathname.startsWith('/api/stripe/webhook') || // Both /webhook and /webhooks
+      pathname.startsWith('/api/cron/'); // Cron jobs called by scheduler
 
     // Redirect to login if accessing protected routes without auth
     if (!user && !isPublicRoute) {
