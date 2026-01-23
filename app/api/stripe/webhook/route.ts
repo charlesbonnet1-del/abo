@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
+import { createOrchestrator } from '@/lib/agents/agents';
 
 export const dynamic = 'force-dynamic';
 
@@ -280,6 +281,24 @@ export async function POST(request: NextRequest) {
             .eq('id', subscriber.id);
 
           console.log(`Invoice payment failed: ${invoice.id}`);
+
+          // Trigger Recovery Agent
+          try {
+            const orchestrator = createOrchestrator(userId, true); // useAdminClient = true
+            const agentResult = await orchestrator.handleEvent({
+              type: 'payment_failed',
+              subscriberId: subscriber.id,
+              data: {
+                invoice_id: invoice.id,
+                amount: invoice.amount_due || 0,
+                failure_reason: invoice.last_finalization_error?.message || 'unknown',
+              },
+            });
+            console.log('Recovery Agent result:', JSON.stringify(agentResult, null, 2));
+          } catch (agentError) {
+            console.error('Recovery Agent error:', agentError);
+            // Don't fail the webhook if agent fails
+          }
         }
         break;
       }
