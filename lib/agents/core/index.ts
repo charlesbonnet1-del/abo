@@ -2,3 +2,4 @@
 
 export * from './embeddings';
 export * from './memory';
+export * from './reasoning';
