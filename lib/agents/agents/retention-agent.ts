@@ -59,9 +59,10 @@ export class RetentionAgent extends BaseAgent {
   protected async performAction(action: Record<string, unknown>): Promise<void> {
     const result = action.result as Record<string, unknown>;
     const actionType = action.action_type as string;
+    const actionId = action.id as string;
 
     if (actionType === 'email') {
-      await sendAgentEmail({
+      const emailResult = await sendAgentEmail({
         to: result.subscriber_email as string,
         subscriberName: result.subscriber_name as string | undefined,
         subject: result.email_subject as string | undefined,
@@ -77,6 +78,24 @@ export class RetentionAgent extends BaseAgent {
         },
         useAdminClient: this.useAdminClient,
       });
+
+      // Store email content in the action result
+      if (emailResult.success && emailResult.subject && emailResult.body) {
+        const supabase = await this.getClient();
+        if (supabase) {
+          await supabase
+            .from('agent_action')
+            .update({
+              result: {
+                ...result,
+                email_subject: emailResult.subject,
+                email_body: emailResult.body,
+                email_message_id: emailResult.messageId,
+              },
+            })
+            .eq('id', actionId);
+        }
+      }
     }
 
     // Actions Stripe (discount, pause) à implémenter

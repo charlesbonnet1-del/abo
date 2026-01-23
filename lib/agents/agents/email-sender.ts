@@ -40,6 +40,8 @@ interface SendEmailParams {
 export async function sendAgentEmail(params: SendEmailParams): Promise<{
   success: boolean;
   messageId?: string;
+  subject?: string;
+  body?: string;
   error?: string;
 }> {
   const {
@@ -49,7 +51,6 @@ export async function sendAgentEmail(params: SendEmailParams): Promise<{
     body,
     agentType,
     brandSettings,
-    userId,
     subscriberId,
     context,
     useAdminClient = false,
@@ -88,7 +89,6 @@ export async function sendAgentEmail(params: SendEmailParams): Promise<{
     const supabase = useAdminClient ? createAdminClient() : await createClient();
     if (supabase) {
       await supabase.from('agent_communication').insert({
-        user_id: userId,
         subscriber_id: subscriberId,
         agent_type: agentType,
         channel: 'email',
@@ -99,7 +99,12 @@ export async function sendAgentEmail(params: SendEmailParams): Promise<{
       });
     }
 
-    return { success: true, messageId: response.data?.id };
+    return {
+      success: true,
+      messageId: response.data?.id,
+      subject: emailSubject,
+      body: emailBody,
+    };
   } catch (error) {
     console.error('Email send error:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
