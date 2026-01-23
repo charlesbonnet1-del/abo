@@ -147,7 +147,7 @@ export async function POST() {
     while (hasMore) {
       const subscriptions: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
         status: 'all',
-        expand: ['data.items.data.price', 'data.items.data.price.product', 'data.default_payment_method'],
+        expand: ['data.items.data.price', 'data.default_payment_method'],
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
       }, {
@@ -182,17 +182,26 @@ export async function POST() {
           const interval = price?.recurring?.interval;
           const amount = price?.unit_amount || 0;
 
-          // Get product name (from expanded product or cache)
+          // Get product name (from cache or fetch separately)
           let productName: string | null = null;
           if (price?.product) {
-            if (typeof price.product === 'string') {
-              // Product not expanded, check cache or fetch later
-              productName = productCache.get(price.product) || null;
+            const productId = typeof price.product === 'string' ? price.product : price.product.id;
+
+            // Check cache first
+            if (productCache.has(productId)) {
+              productName = productCache.get(productId)!;
             } else {
-              // Product is expanded
-              const product = price.product as Stripe.Product;
-              productName = product.name;
-              productCache.set(product.id, product.name);
+              // Fetch product from Stripe
+              try {
+                const product = await stripe.products.retrieve(productId, {
+                  stripeAccount: stripeAccountId,
+                });
+                productName = product.name;
+                productCache.set(productId, product.name);
+              } catch (err) {
+                console.error(`Failed to fetch product ${productId}:`, err);
+                productName = price.nickname || productId;
+              }
             }
           }
 
@@ -386,15 +395,11 @@ export async function POST() {
         const priceItem = sub.items.data[0];
         const price = priceItem?.price;
 
-        // Get product name from cache or expanded product
+        // Get product name from cache (already fetched in subscription processing)
         let productName: string | null = null;
         if (price?.product) {
-          if (typeof price.product === 'string') {
-            productName = productCache.get(price.product) || null;
-          } else {
-            const product = price.product as Stripe.Product;
-            productName = product.name;
-          }
+          const productId = typeof price.product === 'string' ? price.product : price.product.id;
+          productName = productCache.get(productId) || null;
         }
 
         // Access period dates (they exist but aren't in the type definition for newer API versions)
