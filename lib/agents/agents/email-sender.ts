@@ -30,6 +30,7 @@ interface SendEmailParams {
   brandSettings: BrandSettings;
   userId: string;
   subscriberId: string;
+  actionId?: string; // Link to the agent_action that triggered this email
   context?: Record<string, unknown>;
   useAdminClient?: boolean;
 }
@@ -52,6 +53,7 @@ export async function sendAgentEmail(params: SendEmailParams): Promise<{
     agentType,
     brandSettings,
     subscriberId,
+    actionId,
     context,
     useAdminClient = false,
   } = params;
@@ -91,6 +93,7 @@ export async function sendAgentEmail(params: SendEmailParams): Promise<{
       await supabase.from('agent_communication').insert({
         subscriber_id: subscriberId,
         agent_type: agentType,
+        action_id: actionId || null, // Link to the action that triggered this email
         channel: 'email',
         subject: emailSubject,
         content: emailBody,

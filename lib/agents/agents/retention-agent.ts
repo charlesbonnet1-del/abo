@@ -71,6 +71,7 @@ export class RetentionAgent extends BaseAgent {
         brandSettings: this.brandSettings!,
         userId: this.userId,
         subscriberId: action.subscriber_id as string,
+        actionId, // Link email to action for outcome tracking
         context: {
           trigger: result.trigger,
           strategy: result.strategy,
