@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, getUser } from '@/lib/supabase/server';
-import { createConnectedStripeClient } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
@@ -66,16 +66,18 @@ export async function POST() {
 
   const { data: userData, error: userError } = await supabase
     .from('user')
-    .select('stripe_access_token')
+    .select('stripe_account_id')
     .eq('id', user.id)
     .single();
 
-  if (userError || !userData?.stripe_access_token) {
+  if (userError || !userData?.stripe_account_id) {
     return NextResponse.json({ error: 'not_connected' }, { status: 400 });
   }
 
+  const stripeAccountId = userData.stripe_account_id;
+
   try {
-    const stripe = createConnectedStripeClient(userData.stripe_access_token);
+    const stripe = getStripe();
 
     // Maps to track data
     const customerMap = new Map<string, SubscriberData>();
@@ -93,6 +95,8 @@ export async function POST() {
       const customers: Stripe.ApiList<Stripe.Customer> = await stripe.customers.list({
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
+      }, {
+        stripeAccount: stripeAccountId,
       });
 
       for (const customer of customers.data) {
@@ -143,6 +147,8 @@ export async function POST() {
         expand: ['data.items.data.price', 'data.default_payment_method'],
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
+      }, {
+        stripeAccount: stripeAccountId,
       });
 
       for (const sub of subscriptions.data) {
@@ -247,6 +253,8 @@ export async function POST() {
       const invoices: Stripe.ApiList<Stripe.Invoice> = await stripe.invoices.list({
         limit: 100,
         ...(startingAfter && { starting_after: startingAfter }),
+      }, {
+        stripeAccount: stripeAccountId,
       });
 
       for (const invoice of invoices.data) {
