@@ -3,3 +3,4 @@
 export * from './embeddings';
 export * from './memory';
 export * from './reasoning';
+export * from './learning';
