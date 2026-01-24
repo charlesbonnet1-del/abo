@@ -1,6 +1,7 @@
 import { RecoveryAgent, createRecoveryAgent } from './recovery-agent';
 import { RetentionAgent, createRetentionAgent } from './retention-agent';
 import { ConversionAgent, createConversionAgent } from './conversion-agent';
+import { OnboardingAgent, createOnboardingAgent } from './onboarding-agent';
 import { AgentActionResult } from './base-agent';
 import { AgentType } from '../types/agent-types';
 
@@ -27,6 +28,7 @@ export class AgentOrchestrator {
   private recoveryAgent: RecoveryAgent | null = null;
   private retentionAgent: RetentionAgent | null = null;
   private conversionAgent: ConversionAgent | null = null;
+  private onboardingAgent: OnboardingAgent | null = null;
 
   constructor(userId: string, useAdminClient: boolean = false) {
     this.userId = userId;
@@ -55,6 +57,13 @@ export class AgentOrchestrator {
       this.conversionAgent = createConversionAgent(this.userId, this.useAdminClient);
     }
     return this.conversionAgent;
+  }
+
+  private getOnboardingAgent(): OnboardingAgent {
+    if (!this.onboardingAgent) {
+      this.onboardingAgent = createOnboardingAgent(this.userId, this.useAdminClient);
+    }
+    return this.onboardingAgent;
   }
 
   /**
@@ -91,6 +100,16 @@ export class AgentOrchestrator {
       return 'conversion';
     }
 
+    // Onboarding agent triggers
+    const onboardingTriggers = [
+      'new_subscriber',
+      'onboarding_step',
+      'subscription_created',
+    ];
+    if (onboardingTriggers.includes(eventType)) {
+      return 'onboarding';
+    }
+
     return null;
   }
 
@@ -119,6 +138,9 @@ export class AgentOrchestrator {
           break;
         case 'conversion':
           result = await this.handleConversionEvent(event);
+          break;
+        case 'onboarding':
+          result = await this.handleOnboardingEvent(event);
           break;
       }
 
@@ -259,6 +281,34 @@ export class AgentOrchestrator {
   }
 
   /**
+   * Traite les événements d'onboarding
+   */
+  private async handleOnboardingEvent(event: OrchestratorEvent): Promise<AgentActionResult | null> {
+    const agent = this.getOnboardingAgent();
+    await agent.initialize();
+
+    const data = event.data || {};
+
+    switch (event.type) {
+      case 'new_subscriber':
+      case 'subscription_created':
+        return agent.handleNewSubscriber(
+          event.subscriberId,
+          data.subscription as Record<string, unknown> | undefined
+        );
+
+      case 'onboarding_step':
+        return agent.handleOnboardingStep(
+          event.subscriberId,
+          (data.step as number) || 1
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  /**
    * Traite plusieurs événements en batch
    */
   async handleEvents(events: OrchestratorEvent[]): Promise<OrchestratorResult[]> {
@@ -280,7 +330,15 @@ export class AgentOrchestrator {
       recovery: { initialized: !!this.recoveryAgent },
       retention: { initialized: !!this.retentionAgent },
       conversion: { initialized: !!this.conversionAgent },
+      onboarding: { initialized: !!this.onboardingAgent },
     };
+  }
+
+  /**
+   * Accès direct à l'agent d'onboarding pour les opérations spécifiques
+   */
+  getOnboarding(): OnboardingAgent {
+    return this.getOnboardingAgent();
   }
 }
 
