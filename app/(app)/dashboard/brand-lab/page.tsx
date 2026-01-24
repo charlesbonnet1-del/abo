@@ -8,9 +8,11 @@ import { TagInput } from '@/components/ui/TagInput';
 import { ToneSlider } from '@/components/ui/ToneSlider';
 import { TextAreaList } from '@/components/ui/TextAreaList';
 import { HumorSelector } from '@/components/ui/HumorSelector';
+import { ProductsTab } from '@/components/brand-lab/ProductsTab';
+import { PlansTab } from '@/components/brand-lab/PlansTab';
 
 // Types
-type Tab = 'entreprise' | 'produit' | 'objectifs' | 'voix' | 'segments';
+type Tab = 'entreprise' | 'produits' | 'plans' | 'objectifs' | 'voix' | 'segments';
 type ProductType = 'saas' | 'mobile_app' | 'ecommerce' | 'service' | 'marketplace' | 'media' | 'other';
 type TargetAudience = 'freelance' | 'startup' | 'pme' | 'enterprise' | 'b2c' | 'mixed';
 type SegmentStrategy = 'conservative' | 'moderate' | 'aggressive';
@@ -104,7 +106,8 @@ const defaultSettings: BrandSettings = {
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'entreprise', label: 'Mon entreprise' },
-  { id: 'produit', label: 'Mon produit' },
+  { id: 'produits', label: 'Produits' },
+  { id: 'plans', label: 'Plans' },
   { id: 'objectifs', label: 'Mes objectifs' },
   { id: 'voix', label: 'Ma voix' },
   { id: 'segments', label: 'Segments' },
@@ -258,28 +261,6 @@ export default function BrandLabPage() {
 
   const updateSettings = <K extends keyof BrandSettings>(key: K, value: BrandSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  // Feature management
-  const addFeature = () => {
-    const newFeature: Feature = {
-      id: crypto.randomUUID(),
-      name: '',
-      description: '',
-      value_prop: '',
-      paid_only: false,
-    };
-    updateSettings('features', [...settings.features, newFeature]);
-  };
-
-  const updateFeature = (id: string, updates: Partial<Feature>) => {
-    updateSettings('features', settings.features.map(f =>
-      f.id === id ? { ...f, ...updates } : f
-    ));
-  };
-
-  const removeFeature = (id: string) => {
-    updateSettings('features', settings.features.filter(f => f.id !== id));
   };
 
   // Objective management
@@ -479,131 +460,11 @@ export default function BrandLabPage() {
           </>
         )}
 
-        {/* Mon produit */}
-        {activeTab === 'produit' && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Features clés</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500 mb-4">
-                  Quelles sont les features les plus importantes de ton produit ? Les agents utiliseront ces infos pour personnaliser leurs messages.
-                </p>
-                <div className="space-y-4">
-                  {settings.features.map((feature, index) => (
-                    <div key={feature.id} className="p-4 border border-gray-200 rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-500">Feature {index + 1}</span>
-                        <button
-                          onClick={() => removeFeature(feature.id)}
-                          className="text-sm text-red-600 hover:text-red-700"
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        value={feature.name}
-                        onChange={(e) => updateFeature(feature.id, { name: e.target.value })}
-                        placeholder="Nom de la feature"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={feature.description}
-                        onChange={(e) => updateFeature(feature.id, { description: e.target.value })}
-                        placeholder="Description courte"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={feature.value_prop}
-                        onChange={(e) => updateFeature(feature.id, { value_prop: e.target.value })}
-                        placeholder="Valeur client (ex: Gain de temps, vue d'ensemble claire)"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      />
-                      <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input
-                          type="checkbox"
-                          checked={feature.paid_only}
-                          onChange={(e) => updateFeature(feature.id, { paid_only: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        Feature payante uniquement
-                      </label>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addFeature}
-                    className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
-                  >
-                    + Ajouter une feature
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Produits (nouveau) */}
+        {activeTab === 'produits' && <ProductsTab />}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Aha! Moment</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500 mb-4">
-                  Le &quot;Aha! Moment&quot; c&apos;est l&apos;instant où ton utilisateur comprend vraiment la valeur de ton produit.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        checked={settings.aha_moment_known}
-                        onChange={() => updateSettings('aha_moment_known', true)}
-                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="text-sm text-gray-700">Oui, je le connais</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        checked={!settings.aha_moment_known}
-                        onChange={() => updateSettings('aha_moment_known', false)}
-                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="text-sm text-gray-700">Non, pas vraiment</span>
-                    </label>
-                  </div>
-
-                  {settings.aha_moment_known ? (
-                    <textarea
-                      value={settings.aha_moment_description}
-                      onChange={(e) => updateSettings('aha_moment_description', e.target.value)}
-                      placeholder="Ex: Quand l'utilisateur crée son premier projet et invite au moins un membre de son équipe"
-                      rows={3}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
-                    />
-                  ) : (
-                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        💡 Pas de souci ! Donne-nous une première hypothèse et nos agents analyseront les résultats pour affiner cette définition au fil du temps.
-                      </p>
-                      <p className="text-sm text-blue-600 mt-2 italic">
-                        Spoiler : ils finiront probablement par mieux connaître ton Aha! Moment que toi 😉
-                      </p>
-                      <textarea
-                        value={settings.aha_moment_description}
-                        onChange={(e) => updateSettings('aha_moment_description', e.target.value)}
-                        placeholder="Hypothèse de départ (optionnel)"
-                        rows={2}
-                        className="w-full mt-3 px-4 py-2 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none bg-white"
-                      />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+        {/* Plans (nouveau) */}
+        {activeTab === 'plans' && <PlansTab />}
 
         {/* Mes objectifs */}
         {activeTab === 'objectifs' && (

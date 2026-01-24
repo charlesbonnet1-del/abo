@@ -444,6 +444,84 @@ export async function POST() {
     console.log(`Synced ${syncedSubscriptions} subscriptions`);
 
     // =====================
+    // 5.5. UPDATE ENTITLED FEATURES
+    // =====================
+    console.log('Updating subscriber entitled features...');
+    let updatedEntitlements = 0;
+
+    // Get all plans for this user
+    const { data: userPlans } = await supabase
+      .from('plan')
+      .select('id, product_id, stripe_product_id, stripe_price_id, features_from_stripe, features_manual')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (userPlans && userPlans.length > 0) {
+      // Create lookup maps
+      const planByStripeProductId = new Map<string, typeof userPlans[0]>();
+      const planByStripePriceId = new Map<string, typeof userPlans[0]>();
+
+      for (const plan of userPlans) {
+        if (plan.stripe_product_id) {
+          planByStripeProductId.set(plan.stripe_product_id, plan);
+        }
+        if (plan.stripe_price_id) {
+          planByStripePriceId.set(plan.stripe_price_id, plan);
+        }
+      }
+
+      // Update entitled features for each subscriber based on their subscription
+      for (const [stripeCustomerId, subs] of Array.from(subscriptionsByCustomer.entries())) {
+        const subscriberId = subscriberIdMap.get(stripeCustomerId);
+        if (!subscriberId) continue;
+
+        // Get the active/trialing subscription
+        const activeSub = subs.find(
+          (s) => s.status === 'active' || s.status === 'trialing'
+        );
+
+        if (activeSub) {
+          const priceItem = activeSub.items.data[0];
+          const price = priceItem?.price;
+          const productId = price?.product
+            ? typeof price.product === 'string'
+              ? price.product
+              : price.product.id
+            : null;
+
+          // Find matching plan (try by price first, then by product)
+          let matchedPlan = price?.id ? planByStripePriceId.get(price.id) : null;
+          if (!matchedPlan && productId) {
+            matchedPlan = planByStripeProductId.get(productId);
+          }
+
+          if (matchedPlan) {
+            // Get features (manual takes priority over Stripe)
+            const features =
+              matchedPlan.features_manual && matchedPlan.features_manual.length > 0
+                ? matchedPlan.features_manual
+                : matchedPlan.features_from_stripe || [];
+
+            // Update subscriber with entitled features
+            const { error: updateError } = await supabase
+              .from('subscriber')
+              .update({
+                entitled_features: features,
+                product_id: matchedPlan.product_id,
+              })
+              .eq('id', subscriberId);
+
+            if (!updateError) {
+              updatedEntitlements++;
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`Updated ${updatedEntitlements} subscriber entitlements`);
+
+    // =====================
     // 6. UPSERT INVOICES
     // =====================
     console.log('Upserting invoices...');
