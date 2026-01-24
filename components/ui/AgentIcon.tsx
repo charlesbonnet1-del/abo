@@ -1,5 +1,5 @@
 interface AgentIconProps {
-  type: 'recovery' | 'retention' | 'conversion';
+  type: 'recovery' | 'retention' | 'conversion' | 'onboarding';
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -37,6 +37,17 @@ const agentConfig = {
     ),
     label: 'Conversion',
   },
+  onboarding: {
+    color: 'bg-indigo-500',
+    lightColor: 'bg-indigo-100',
+    textColor: 'text-indigo-600',
+    icon: (
+      <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+      </svg>
+    ),
+    label: 'Onboarding',
+  },
 };
 
 export function AgentIcon({ type, size = 'md' }: AgentIconProps) {
@@ -55,6 +66,6 @@ export function AgentIcon({ type, size = 'md' }: AgentIconProps) {
   );
 }
 
-export function getAgentConfig(type: 'recovery' | 'retention' | 'conversion') {
+export function getAgentConfig(type: 'recovery' | 'retention' | 'conversion' | 'onboarding') {
   return agentConfig[type];
 }

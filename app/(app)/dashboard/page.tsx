@@ -16,6 +16,7 @@ interface DashboardData {
   recoveredThisMonth: number;
   churnAvoidedThisMonth: number;
   conversionsThisMonth: number;
+  onboardedThisMonth: number;
   pendingActions: PendingAction[];
   agentConfigs: AgentConfig[];
   agentStats: Record<string, AgentStats>;
@@ -82,6 +83,7 @@ export default function DashboardPage() {
         recoveredThisMonth: 0,
         churnAvoidedThisMonth: 0,
         conversionsThisMonth: 0,
+        onboardedThisMonth: 0,
         pendingActions: [],
         agentConfigs: [],
         agentStats: {},
@@ -97,6 +99,7 @@ export default function DashboardPage() {
       recoveryResult,
       retentionResult,
       conversionResult,
+      onboardingResult,
       pendingActionsResult,
       agentConfigsResult,
     ] = await Promise.all([
@@ -132,6 +135,13 @@ export default function DashboardPage() {
         .gte('created_at', startOfMonth),
       supabase
         .from('agent_action')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('agent_type', 'onboarding')
+        .eq('status', 'executed')
+        .gte('created_at', startOfMonth),
+      supabase
+        .from('agent_action')
         .select('id, agent_type, action_type, description, created_at, subscriber_id')
         .eq('user_id', user.id)
         .eq('status', 'pending_approval')
@@ -147,7 +157,7 @@ export default function DashboardPage() {
 
     // Get agent stats
     const agentStats: Record<string, AgentStats> = {};
-    for (const agentType of ['recovery', 'retention', 'conversion']) {
+    for (const agentType of ['recovery', 'retention', 'conversion', 'onboarding']) {
       const { data: lastActionData } = await supabase
         .from('agent_action')
         .select('description, created_at')
@@ -180,6 +190,7 @@ export default function DashboardPage() {
       recoveredThisMonth: recoveryResult.count || 0,
       churnAvoidedThisMonth: retentionResult.count || 0,
       conversionsThisMonth: conversionResult.count || 0,
+      onboardedThisMonth: onboardingResult.count || 0,
       pendingActions: pendingActionsResult.data || [],
       agentConfigs: agentConfigsResult.data || [],
       agentStats,
@@ -295,7 +306,7 @@ export default function DashboardPage() {
             {data.pendingActions.slice(0, 3).map((action) => (
               <div key={action.id} className="bg-white rounded-lg p-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <AgentIcon type={action.agent_type as 'recovery' | 'retention' | 'conversion'} size="sm" />
+                  <AgentIcon type={action.agent_type as 'recovery' | 'retention' | 'conversion' | 'onboarding'} size="sm" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">{action.description}</p>
                     <TimeAgo date={action.created_at} className="text-xs" />
@@ -316,11 +327,29 @@ export default function DashboardPage() {
       )}
 
       {/* Agent Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(['recovery', 'retention', 'conversion'] as const).map((agentType) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {(['recovery', 'retention', 'conversion', 'onboarding'] as const).map((agentType) => {
           const config = getAgentConfig(agentType);
           const isActive = getAgentIsActive(agentType);
           const stats = data.agentStats[agentType];
+
+          const getDescription = () => {
+            switch (agentType) {
+              case 'recovery': return 'Recupere les paiements';
+              case 'retention': return 'Reduit le churn';
+              case 'conversion': return 'Convertit les prospects';
+              case 'onboarding': return 'Accueille les nouveaux';
+            }
+          };
+
+          const getStatsLabel = () => {
+            switch (agentType) {
+              case 'recovery': return 'recuperes';
+              case 'retention': return 'retenus';
+              case 'conversion': return 'convertis';
+              case 'onboarding': return 'accueillis';
+            }
+          };
 
           return (
             <div key={agentType} className="bg-white rounded-xl border border-gray-200 p-5">
@@ -329,11 +358,7 @@ export default function DashboardPage() {
                   <AgentIcon type={agentType} size="md" />
                   <div>
                     <h3 className="font-semibold text-gray-900">{config.label}</h3>
-                    <p className="text-xs text-gray-500">
-                      {agentType === 'recovery' && 'Recupere les paiements'}
-                      {agentType === 'retention' && 'Reduit le churn'}
-                      {agentType === 'conversion' && 'Convertit les prospects'}
-                    </p>
+                    <p className="text-xs text-gray-500">{getDescription()}</p>
                   </div>
                 </div>
               </div>
@@ -357,7 +382,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Ce mois</span>
                   <span className="font-semibold text-gray-900">
-                    {stats?.executedThisMonth || 0} {agentType === 'recovery' ? 'recuperes' : agentType === 'retention' ? 'retenus' : 'convertis'}
+                    {stats?.executedThisMonth || 0} {getStatsLabel()}
                   </span>
                 </div>
               </div>
