@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AgentIcon, getAgentConfig } from '@/components/ui/AgentIcon';
 
-type AgentType = 'recovery' | 'retention' | 'conversion';
+type AgentType = 'recovery' | 'retention' | 'conversion' | 'onboarding';
 type ConfigTab = 'activation' | 'template' | 'strategie' | 'offres' | 'limites' | 'validation';
 type StrategyTemplate = 'conservative' | 'moderate' | 'aggressive' | 'custom';
 type ConfidenceLevel = 'review_all' | 'auto_with_copy' | 'full_auto';
@@ -64,6 +64,14 @@ interface ActionRule {
   threshold?: number;
 }
 
+interface OnboardingSequenceConfig {
+  total_steps: number;
+  delay_between_steps: number; // hours
+  welcome_email_enabled: boolean;
+  feature_highlight_enabled: boolean;
+  aha_moment_enabled: boolean;
+}
+
 interface AgentConfigData {
   id?: string;
   user_id?: string;
@@ -83,6 +91,8 @@ interface AgentConfigData {
   conversion_triggers: string[];
   trial_warning_days: number;
   freemium_conversion_days: number;
+  // Onboarding specific
+  onboarding_sequence: OnboardingSequenceConfig;
   // Offers & Limits
   offers_config: OffersConfig;
   limits_config: LimitsConfig;
@@ -109,6 +119,13 @@ const defaultConfig: AgentConfigData = {
   conversion_triggers: ['trial_ending', 'freemium_inactive'],
   trial_warning_days: 3,
   freemium_conversion_days: 7,
+  onboarding_sequence: {
+    total_steps: 3,
+    delay_between_steps: 24,
+    welcome_email_enabled: true,
+    feature_highlight_enabled: true,
+    aha_moment_enabled: true,
+  },
   offers_config: {
     discount_enabled: true,
     discount_percent: 10,
@@ -204,12 +221,14 @@ const agentLabels: Record<AgentType, string> = {
   recovery: 'Recovery Agent',
   retention: 'Retention Agent',
   conversion: 'Conversion Agent',
+  onboarding: 'Onboarding Agent',
 };
 
 const agentDescriptions: Record<AgentType, string> = {
   recovery: 'Configure la stratégie de récupération des paiements',
   retention: 'Configure la stratégie de rétention des clients',
   conversion: 'Configure la stratégie de conversion des prospects',
+  onboarding: 'Configure la séquence d\'accueil des nouveaux clients',
 };
 
 // Action types per agent for HITL rules
@@ -234,6 +253,11 @@ const agentActionTypes: Record<AgentType, { type: string; label: string; canAuto
     { type: 'extend_trial', label: 'Prolonger le trial', canAuto: true },
     { type: 'apply_discount', label: 'Appliquer une réduction Stripe', canAuto: false, warning: 'Action financière' },
   ],
+  onboarding: [
+    { type: 'send_welcome_email', label: 'Envoyer email de bienvenue', canAuto: true },
+    { type: 'send_feature_email', label: 'Envoyer email de feature', canAuto: true },
+    { type: 'send_tips_email', label: 'Envoyer email de conseils', canAuto: true },
+  ],
 };
 
 export default function AgentConfigPage() {
@@ -249,7 +273,7 @@ export default function AgentConfigPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isValidAgent = ['recovery', 'retention', 'conversion'].includes(agentType);
+  const isValidAgent = ['recovery', 'retention', 'conversion', 'onboarding'].includes(agentType);
 
   const loadConfig = useCallback(async () => {
     try {
@@ -277,6 +301,10 @@ export default function AgentConfigPage() {
       }
 
       if (configData) {
+        // Extract onboarding config from strategy_config if present
+        const strategyConfig = configData.strategy_config || {};
+        const onboardingFromStrategy = strategyConfig.onboarding_sequence || {};
+
         setConfig({
           ...defaultConfig,
           ...configData,
@@ -286,6 +314,7 @@ export default function AgentConfigPage() {
           recovery_exclusions: configData.recovery_exclusions || defaultConfig.recovery_exclusions,
           retention_triggers: configData.retention_triggers || defaultConfig.retention_triggers,
           conversion_triggers: configData.conversion_triggers || defaultConfig.conversion_triggers,
+          onboarding_sequence: { ...defaultConfig.onboarding_sequence, ...onboardingFromStrategy },
           offers_config: { ...defaultConfig.offers_config, ...configData.offers_config },
           limits_config: { ...defaultConfig.limits_config, ...configData.limits_config },
           action_rules: configData.action_rules || [],
@@ -340,6 +369,7 @@ export default function AgentConfigPage() {
         conversion_triggers: config.conversion_triggers,
         trial_warning_days: config.trial_warning_days,
         freemium_conversion_days: config.freemium_conversion_days,
+        strategy_config: agentType === 'onboarding' ? { onboarding_sequence: config.onboarding_sequence } : {},
         offers_config: config.offers_config,
         limits_config: config.limits_config,
         action_rules: config.action_rules,
@@ -380,6 +410,13 @@ export default function AgentConfigPage() {
     setConfig(prev => ({
       ...prev,
       limits_config: { ...prev.limits_config, [key]: value },
+    }));
+  };
+
+  const updateOnboarding = <K extends keyof OnboardingSequenceConfig>(key: K, value: OnboardingSequenceConfig[K]) => {
+    setConfig(prev => ({
+      ...prev,
+      onboarding_sequence: { ...prev.onboarding_sequence, [key]: value },
     }));
   };
 
@@ -809,6 +846,112 @@ export default function AgentConfigPage() {
                 </CardContent>
               </Card>
             )}
+
+            {agentType === 'onboarding' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Séquence d&apos;onboarding</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Configure comment accueillir les nouveaux clients avec une série d&apos;emails personnalisés.
+                  </p>
+
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Paramètres de la séquence</h4>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600 w-48">Nombre d&apos;emails :</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={config.onboarding_sequence.total_steps}
+                            onChange={(e) => updateOnboarding('total_steps', parseInt(e.target.value) || 3)}
+                            className="w-20 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
+                          />
+                          <span className="text-sm text-gray-500">emails dans la séquence</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600 w-48">Délai entre les emails :</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="168"
+                            value={config.onboarding_sequence.delay_between_steps}
+                            onChange={(e) => updateOnboarding('delay_between_steps', parseInt(e.target.value) || 24)}
+                            className="w-20 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
+                          />
+                          <span className="text-sm text-gray-500">heures</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-6">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Contenu des emails</h4>
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.onboarding_sequence.welcome_email_enabled}
+                            onChange={(e) => updateOnboarding('welcome_email_enabled', e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Email de bienvenue</span>
+                            <p className="text-xs text-gray-500">Premier email chaleureux pour accueillir le client</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.onboarding_sequence.feature_highlight_enabled}
+                            onChange={(e) => updateOnboarding('feature_highlight_enabled', e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Mise en avant des features</span>
+                            <p className="text-xs text-gray-500">Présente les fonctionnalités clés configurées dans le Brand Lab</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.onboarding_sequence.aha_moment_enabled}
+                            onChange={(e) => updateOnboarding('aha_moment_enabled', e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">Guide vers le moment Aha</span>
+                            <p className="text-xs text-gray-500">Aide le client à découvrir la valeur du produit (si configuré dans Brand Lab)</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-6">
+                      <div className="p-4 bg-indigo-50 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-indigo-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <p className="text-sm font-medium text-indigo-900">Features du Brand Lab</p>
+                            <p className="text-sm text-indigo-700 mt-1">
+                              L&apos;agent utilise automatiquement les features et descriptions configurées dans le Brand Lab.
+                              Il ne mentionne <strong>jamais</strong> de features non configurées.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
 
@@ -1045,6 +1188,21 @@ export default function AgentConfigPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {agentType === 'onboarding' && (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Pas d&apos;offres promotionnelles</h4>
+                  <p className="text-sm text-gray-500 max-w-md mx-auto">
+                    L&apos;agent d&apos;onboarding se concentre sur l&apos;accueil et l&apos;éducation des nouveaux clients.
+                    Il n&apos;envoie pas d&apos;offres promotionnelles.
+                  </p>
                 </div>
               )}
             </CardContent>
