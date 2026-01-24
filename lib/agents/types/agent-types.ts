@@ -1,6 +1,6 @@
 // Types de base pour les agents IA
 
-export type AgentType = 'recovery' | 'retention' | 'conversion';
+export type AgentType = 'recovery' | 'retention' | 'conversion' | 'onboarding';
 
 export type MemoryType = 'interaction' | 'preference' | 'pattern' | 'outcome' | 'fact';
 

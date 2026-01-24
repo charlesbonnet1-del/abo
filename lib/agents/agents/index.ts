@@ -6,6 +6,7 @@ export type { AgentEvent, AgentActionResult } from './base-agent';
 export { RecoveryAgent, createRecoveryAgent } from './recovery-agent';
 export { RetentionAgent, createRetentionAgent } from './retention-agent';
 export { ConversionAgent, createConversionAgent } from './conversion-agent';
+export { OnboardingAgent, createOnboardingAgent } from './onboarding-agent';
 
 export { sendAgentEmail } from './email-sender';
 
