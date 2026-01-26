@@ -11,6 +11,7 @@ interface SubscriberData {
   stripe_customer_id: string;
   email: string | null;
   name: string | null;
+  phone: string | null;
   subscription_status: string;
   mrr: number;
   plan_name: string | null;
@@ -104,12 +105,19 @@ export async function POST() {
       for (const customer of customers.data) {
         if (customer.deleted) continue;
 
+        // Extract phone: prefer customer.phone, fallback to metadata.phone
+        const phone = customer.phone
+          || (customer.metadata?.phone as string)
+          || (customer.metadata?.phone_number as string)
+          || null;
+
         const now = new Date().toISOString();
         customerMap.set(customer.id, {
           user_id: user.id,
           stripe_customer_id: customer.id,
           email: customer.email ?? null,
           name: customer.name ?? null,
+          phone,
           subscription_status: 'none',
           mrr: 0,
           plan_name: null,
