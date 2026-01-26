@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { AgentIcon, getAgentConfig } from '@/components/ui/AgentIcon';
 import { TimeAgo, formatDateTime } from '@/components/ui/TimeAgo';
 
-type AgentType = 'recovery' | 'retention' | 'conversion';
+type AgentType = 'recovery' | 'retention' | 'conversion' | 'onboarding';
 type ActionStatus = 'pending_approval' | 'approved' | 'rejected' | 'executed' | 'failed';
 
 interface AgentAction {
@@ -53,6 +53,12 @@ const actionLabels: Record<string, string> = {
   offer_trial_extension: 'Prolongation d\'essai proposee',
   offer_first_month_discount: 'Reduction 1er mois offerte',
   send_feature_highlight: 'Feature mise en avant',
+  // Onboarding actions
+  send_welcome_email: 'Email de bienvenue envoye',
+  onboarding_email: 'Email d\'onboarding envoye',
+  send_feature_email: 'Email de feature envoye',
+  send_tips_email: 'Email de conseils envoye',
+  email: 'Email envoye',
 };
 
 const statusLabels: Record<ActionStatus, { label: string; color: string; icon: string }> = {
@@ -67,6 +73,7 @@ const agentLabels: Record<AgentType, string> = {
   recovery: 'Recovery Agent',
   retention: 'Retention Agent',
   conversion: 'Conversion Agent',
+  onboarding: 'Onboarding Agent',
 };
 
 const periodOptions = [
@@ -136,7 +143,7 @@ export default function AgentHistoryPage() {
   const [modal, setModal] = useState<ActionModalData | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  const isValidAgent = ['recovery', 'retention', 'conversion'].includes(agentType);
+  const isValidAgent = ['recovery', 'retention', 'conversion', 'onboarding'].includes(agentType);
 
   const loadActions = useCallback(async () => {
     try {
