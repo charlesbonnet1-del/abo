@@ -48,12 +48,18 @@ await stripe.customers.list({}, { stripeAccount: user.stripe_account_id });
       /learn/route.ts       # Enregistrement des outcomes
     /products               # API Brand Lab v2 (produits)
     /plans                  # API Brand Lab v2 (plans)
+    /sdk
+      /events/route.ts      # Réception événements SDK (auth via x-abo-key)
+      /api-key/route.ts     # Gestion clé API (auto-génération)
+      /chat/route.ts        # Chatbot d'aide à l'intégration (Groq streaming)
     /cron
       /recovery/route.ts
       /retention/route.ts
       /conversion/route.ts
+      /onboarding/route.ts
       /analyze-patterns/route.ts
   /dashboard
+    /integrations           # Page intégrations (Stripe + SDK + chatbot)
 
 /lib
   /agents
@@ -67,6 +73,7 @@ await stripe.customers.list({}, { stripeAccount: user.stripe_account_id });
       /recovery-agent.ts    # Agent de récupération paiements
       /retention-agent.ts   # Agent de rétention
       /conversion-agent.ts  # Agent de conversion
+      /onboarding-agent.ts  # Agent d'onboarding
       /orchestrator.ts      # Orchestrateur des agents
       /email-sender.ts      # Envoi d'emails via Resend
     /helpers
@@ -76,6 +83,17 @@ await stripe.customers.list({}, { stripeAccount: user.stripe_account_id });
     /server.ts
   /stripe
     /index.ts
+
+/components
+  /ui
+    /IntegrationChatbot.tsx  # Widget chatbot flottant (Groq streaming)
+    /AgentIcon.tsx           # Icônes des types d'agents
+
+/public
+  /abo-analytics.js          # SDK navigateur (fichier statique)
+
+/supabase
+  /migrations                # Migrations DB (001-013)
 ```
 
 ## Tables Supabase
@@ -86,7 +104,8 @@ await stripe.customers.list({}, { stripeAccount: user.stripe_account_id });
 -- Utilisateurs Abo
 user (
   id, email, name, stripe_account_id, stripe_access_token,
-  stripe_refresh_token, stripe_connected_at, company_name
+  stripe_refresh_token, stripe_connected_at, company_name,
+  sdk_api_key
 )
 
 -- Subscribers (clients des users d'Abo)
@@ -94,7 +113,7 @@ subscriber (
   id, user_id, email, name, stripe_customer_id,
   plan_name, mrr, subscription_status, health_score,
   last_payment_status, last_payment_at, current_period_end,
-  trial_end, cancel_at_period_end, entitled_features, product_id
+  trial_end, cancel_at_period_end, entitled_features, product_id, phone
 )
 ```
 
@@ -173,6 +192,21 @@ agent_reasoning_logs (
 )
 ```
 
+### SDK & Tracking comportemental
+
+```sql
+-- Événements comportementaux du SDK
+behavioral_event (
+  id, user_id, subscriber_id, visitor_id, email,
+  stripe_customer_id, external_user_id,
+  event_type, event_name, event_data,
+  page_url, page_title, page_path, referrer,
+  session_id, device_type, browser, os,
+  screen_width, screen_height, event_at, created_at
+)
+-- event_type: page_view, click, scroll, session_start, session_end, feature_use, custom, identify
+```
+
 ## Système d'agents IA
 
 ### Agents existants
@@ -235,17 +269,26 @@ async function getSubscriberFeatures(subscriberId: string): Promise<{
 | ❌ Vides | ✅ Configurées | `plan_default` : features du plan |
 | ❌ Vides | ❌ Vides | `generic` : pas de features spécifiques |
 
-### Problème du grandfathering
-
-Quand un plan évolue (ajout de features), les anciens abonnés gardent leurs features d'origine. Solutions :
-- Features stockées dans metadata Stripe par Price
-- Ou entitled_features figées sur le subscriber lors de la souscription
-
 ### Contrainte critique pour les agents
 
 **Les agents ne doivent JAMAIS inventer ou supposer des features.**
 - Mode `specific` ou `plan_default` : parler uniquement des features configurées
 - Mode `generic` : onboarding/communication généraliste sur le produit, sans mentionner de features spécifiques
+
+## SDK Abo (Tracking comportemental)
+
+### Architecture
+- **Fichier** : `/public/abo-analytics.js` (script statique ~5KB)
+- **API** : `POST /api/sdk/events` (auth via header `x-abo-key`)
+- **Clé API** : `GET/POST /api/sdk/api-key` (auto-génération, format `abo_sk_...`)
+- **Chatbot** : `POST /api/sdk/chat` (streaming SSE via Groq)
+
+### Fonctionnement du SDK navigateur
+- Auto-tracking : pages (+ SPA), clics, scroll, sessions, appareil/navigateur/OS
+- Identification : `AboAnalytics.identify({ email | stripeCustomerId | userId })`
+- Features : `AboAnalytics.feature('feature_key')` ou attribut HTML `data-abo-track`
+- Événements custom : `AboAnalytics.track('event_name', data)`
+- Batch toutes les 5s, visitor_id persistant (localStorage), sessions (sessionStorage, timeout 30min)
 
 ## Webhooks Stripe
 
@@ -292,22 +335,6 @@ RESEND_API_KEY=re_...
 CRON_SECRET=...
 ```
 
-## Commandes de test utiles
-
-```javascript
-// Sync Stripe
-fetch('/api/stripe/sync', { method: 'POST' }).then(r => r.json()).then(console.log);
-
-// Actions des agents
-fetch('/api/agents/actions').then(r => r.json()).then(console.log);
-
-// Debug Stripe
-fetch('/api/stripe/debug').then(r => r.json()).then(console.log);
-
-// Stats apprentissage
-fetch('/api/agents/learning-stats?agentType=recovery').then(r => r.json()).then(console.log);
-```
-
 ## Décisions techniques clés
 
 1. **Stripe Connect** : Header `stripeAccount` pour accéder aux comptes connectés
@@ -325,3 +352,26 @@ fetch('/api/agents/learning-stats?agentType=recovery').then(r => r.json()).then(
 - Tables Supabase en snake_case
 - Types TypeScript dans `/lib/agents/types/`
 - RLS activé sur toutes les tables
+- UI entièrement en **français** (textes, emails agents, chatbot, erreurs)
+
+---
+
+## RÈGLES DE MAINTENANCE OBLIGATOIRES
+
+### Chatbot d'intégration
+
+**Fichier** : `/app/api/sdk/chat/route.ts` → constante `SYSTEM_PROMPT`
+
+Le chatbot (widget flottant sur `/dashboard/integrations`) aide les utilisateurs non-techniques à installer le SDK Abo. Il est alimenté par Groq (llama-3.3-70b-versatile) en streaming.
+
+**RÈGLE 1 : Le `SYSTEM_PROMPT` ne doit JAMAIS dépasser 1200 mots.** Au-delà, le modèle perd en précision. En cas de mise à jour, couper l'information la moins critique en priorité.
+
+**RÈGLE 2 : Le `SYSTEM_PROMPT` DOIT être mis à jour à chaque modification de :**
+1. **SDK** : `public/abo-analytics.js` (nouvelles méthodes, événements, options)
+2. **API SDK** : `/api/sdk/events` ou `/api/sdk/api-key` (paramètres, auth, formats)
+3. **Schéma DB** : tables `behavioral_event`, `subscriber`, `user.sdk_api_key`
+4. **Agents** : nouveaux types, triggers, consommation des données comportementales
+5. **Brand Lab** : types de features, schéma `product_feature`, options de config
+6. **Page Intégrations** : nouvelles étapes, méthodes d'identification, plateformes supportées
+
+**Comment mettre à jour** : chercher `SYSTEM_PROMPT` dans `/app/api/sdk/chat/route.ts`, le prompt est organisé en sections étiquetées (ÉTAPE 1, 2, 3, FAQ, RÈGLES).
