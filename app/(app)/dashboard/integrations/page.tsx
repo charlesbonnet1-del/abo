@@ -12,17 +12,38 @@ interface UserData {
   last_sync_at: string | null;
 }
 
+interface ProductFeature {
+  id: string;
+  feature_key: string;
+  name: string;
+  is_core: boolean;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  product_feature: ProductFeature[];
+}
+
 export default function IntegrationsPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // SDK state
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [generatingKey, setGeneratingKey] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'browser' | 'nodejs'>('browser');
   const [appUrl, setAppUrl] = useState('');
+  const [showBackend, setShowBackend] = useState(false);
+
+  // Feature tracking builder
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
+
+  // Identification
+  const [identifyMethod, setIdentifyMethod] = useState<'email' | 'stripe' | 'userId' | null>(null);
 
   useEffect(() => {
     setAppUrl(window.location.origin);
@@ -51,11 +72,18 @@ export default function IntegrationsPage() {
 
       if (count !== null) setSubscriberCount(count);
 
-      // Load API key
+      // Auto-load/generate API key
       const keyRes = await fetch('/api/sdk/api-key');
       if (keyRes.ok) {
         const keyData = await keyRes.json();
         setApiKey(keyData.apiKey);
+      }
+
+      // Load Brand Lab features
+      const featRes = await fetch('/api/products');
+      if (featRes.ok) {
+        const featData = await featRes.json();
+        setProducts(featData.products || []);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -106,12 +134,8 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleConnect = () => {
-    window.location.href = '/api/stripe/connect';
-  };
-
-  const handleGenerateKey = async () => {
-    setGeneratingKey(true);
+  const handleRegenerateKey = async () => {
+    if (!confirm('Régénérer la clé invalidera l\'ancienne. Le code sur ton site devra être mis à jour. Continuer ?')) return;
     try {
       const res = await fetch('/api/sdk/api-key', { method: 'POST' });
       if (res.ok) {
@@ -119,9 +143,7 @@ export default function IntegrationsPage() {
         setApiKey(data.apiKey);
       }
     } catch (err) {
-      console.error('Error generating key:', err);
-    } finally {
-      setGeneratingKey(false);
+      console.error('Error regenerating key:', err);
     }
   };
 
@@ -131,80 +153,70 @@ export default function IntegrationsPage() {
     setTimeout(() => setCopiedSnippet(null), 2000);
   };
 
-  const browserSnippet = `<!-- Abo Analytics SDK -->
+  const toggleFeature = (featureKey: string) => {
+    setSelectedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(featureKey)) {
+        next.delete(featureKey);
+      } else {
+        next.add(featureKey);
+      }
+      return next;
+    });
+  };
+
+  // All features across all products
+  const allFeatures = products.flatMap(p => p.product_feature || []);
+
+  // ── Generated snippets ──
+
+  const browserSnippet = `<!-- Abo SDK - Colle ce code avant </body> -->
 <script src="${appUrl}/abo-analytics.js"></script>
 <script>
   AboAnalytics.init({
-    apiKey: '${apiKey || 'VOTRE_CLE_API'}',
+    apiKey: '${apiKey || '...'}',
     endpoint: '${appUrl}/api/sdk/events'
   });
-
-  // Identifier l'utilisateur (quand disponible)
-  // AboAnalytics.identify({
-  //   email: 'user@example.com',
-  //   stripeCustomerId: 'cus_xxx', // optionnel
-  //   userId: 'votre-id'           // optionnel
-  // });
 </script>`;
 
-  const nodejsSnippet = `// npm install node-fetch (si Node < 18)
+  const identifySnippet = identifyMethod === 'email'
+    ? `// Après la connexion de l'utilisateur, ajoute :
+AboAnalytics.identify({ email: utilisateur.email });`
+    : identifyMethod === 'stripe'
+    ? `// Après la connexion, si tu as le Stripe ID :
+AboAnalytics.identify({ stripeCustomerId: utilisateur.stripeId });`
+    : identifyMethod === 'userId'
+    ? `// Après la connexion de l'utilisateur, ajoute :
+AboAnalytics.identify({ userId: utilisateur.id });`
+    : '';
 
-const ABO_API_KEY = '${apiKey || 'VOTRE_CLE_API'}';
-const ABO_ENDPOINT = '${appUrl}/api/sdk/events';
-
-async function trackEvent(event) {
-  await fetch(ABO_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-abo-key': ABO_API_KEY,
-    },
-    body: JSON.stringify({
-      events: [{
-        type: event.type,          // 'custom', 'feature_use', 'page_view'
-        name: event.name,          // nom de l'événement
-        data: event.data || {},    // données additionnelles
-        email: event.email,        // identification par email
-        stripeCustomerId: event.stripeCustomerId, // ou par Stripe ID
-        userId: event.userId,      // ou par user ID custom
-        timestamp: new Date().toISOString(),
-      }]
-    }),
+  const featureSnippetLines = Array.from(selectedFeatures).map(key => {
+    const feat = allFeatures.find(f => f.feature_key === key);
+    return `AboAnalytics.feature('${key}');  // ${feat?.name || key}`;
   });
-}
 
-// Exemples d'utilisation :
+  const featureSnippet = featureSnippetLines.length > 0
+    ? `// Appelle ces lignes quand l'utilisateur utilise la feature :\n${featureSnippetLines.join('\n')}`
+    : '';
 
-// Tracker l'utilisation d'une feature
-await trackEvent({
-  type: 'feature_use',
-  name: 'export_pdf',
-  email: 'user@example.com',
-  data: { format: 'pdf', pages: 12 }
-});
+  const backendSnippet = `// Code serveur (Node.js) - Envoie des événements depuis ton backend
+const ABO_KEY = '${apiKey || '...'}';
 
-// Événement custom
-await trackEvent({
-  type: 'custom',
-  name: 'onboarding_completed',
-  stripeCustomerId: 'cus_xxx',
-  data: { steps_completed: 5, duration_minutes: 15 }
+await fetch('${appUrl}/api/sdk/events', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-abo-key': ABO_KEY,
+  },
+  body: JSON.stringify({
+    events: [{
+      type: 'feature_use',         // ou 'custom'
+      name: 'nom_de_la_feature',
+      email: 'user@example.com',   // pour identifier le client
+      data: { /* données libres */ },
+    }]
+  }),
 });`;
-
-  const featureTrackingSnippet = `// Tracker l'utilisation des features (côté navigateur)
-// Les noms doivent correspondre aux features du Brand Lab
-
-AboAnalytics.feature('export_pdf');
-AboAnalytics.feature('team_collaboration', { members: 3 });
-AboAnalytics.feature('api_access', { endpoint: '/users' });
-
-// Événements custom
-AboAnalytics.track('upgrade_clicked', { from: 'free', to: 'pro' });
-AboAnalytics.track('tutorial_completed', { step: 5 });
-
-// Tracking d'éléments HTML (attribut data-abo-track)
-// <button data-abo-track="cta_upgrade">Passer en Pro</button>
-// <a data-abo-track="nav_pricing" href="/pricing">Tarifs</a>`;
 
   if (loading) {
     return (
@@ -226,7 +238,7 @@ AboAnalytics.track('tutorial_completed', { step: 5 });
         <p className="text-gray-500 mt-1">Connecte tes outils et installe le SDK pour alimenter tes agents IA</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-10">
 
         {/* ═══════════════════════════════════════════ */}
         {/* SECTION 1: STRIPE                          */}
@@ -314,7 +326,7 @@ AboAnalytics.track('tutorial_completed', { step: 5 });
                       <p className="text-sm text-gray-500 mb-4">
                         Connecte ton compte Stripe pour synchroniser tes clients, abonnements et paiements.
                       </p>
-                      <Button onClick={handleConnect}>
+                      <Button onClick={() => { window.location.href = '/api/stripe/connect'; }}>
                         Connecter Stripe
                       </Button>
                     </>
@@ -326,10 +338,10 @@ AboAnalytics.track('tutorial_completed', { step: 5 });
         </div>
 
         {/* ═══════════════════════════════════════════ */}
-        {/* SECTION 2: ABO SDK                         */}
+        {/* SECTION 2: ABO SDK - Guided steps          */}
         {/* ═══════════════════════════════════════════ */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -337,265 +349,316 @@ AboAnalytics.track('tutorial_completed', { step: 5 });
             </div>
             Abo SDK
           </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Le SDK observe le comportement de tes utilisateurs sur ton site (pages visitées, features utilisées, clics...) pour que tes agents IA personnalisent leurs actions.
+          </p>
 
-          {/* Info banner */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-            <div className="flex gap-3">
-              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Pourquoi installer le SDK ?</p>
-                <p>Le SDK collecte les données comportementales de tes utilisateurs (pages visitées, features utilisées, clics, sessions...). Ces données permettent à tes agents IA de personnaliser leurs actions et d{"'"}améliorer la rétention, la conversion et l{"'"}onboarding.</p>
-              </div>
+          {/* ── STEP 1: Install the snippet ── */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex-shrink-0">1</span>
+              <h3 className="font-semibold text-gray-900">Colle ce code dans ton site</h3>
             </div>
+
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm text-gray-600 mb-3">
+                  Demande à ton développeur (ou fais-le toi-même) de coller ce code sur <strong>toutes les pages</strong> de ton site, juste avant la balise <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">&lt;/body&gt;</code> :
+                </p>
+                <div className="relative">
+                  <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                    <code>{browserSnippet}</code>
+                  </pre>
+                  <button
+                    onClick={() => copyToClipboard(browserSnippet, 'browser')}
+                    className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                  >
+                    {copiedSnippet === 'browser' ? 'Copié !' : 'Copier'}
+                  </button>
+                </div>
+
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm font-medium text-green-800 mb-2">Une fois installé, le SDK collecte automatiquement :</p>
+                  <div className="grid grid-cols-2 gap-1.5 text-sm text-green-700">
+                    {['Pages visitées', 'Clics sur boutons', 'Scroll', 'Durée des sessions', 'Appareil & navigateur'].map(item => (
+                      <div key={item} className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* API Key info */}
+                {apiKey && (
+                  <div className="mt-4 border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">Ta clé API (déjà incluse dans le code ci-dessus) :</span>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-600 max-w-[200px] truncate">{apiKey}</code>
+                        <button
+                          onClick={() => copyToClipboard(apiKey, 'api-key')}
+                          className="text-xs text-blue-600 hover:text-blue-700"
+                        >
+                          {copiedSnippet === 'api-key' ? 'Copié' : 'Copier'}
+                        </button>
+                        <button
+                          onClick={handleRegenerateKey}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >
+                          Régénérer
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* API Key */}
-          <Card className="mb-4">
-            <CardContent className="p-6">
-              <h3 className="font-medium text-gray-900 mb-2">Clé API</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Ta clé API authentifie le SDK auprès de ton compte Abo. Ne la partage jamais publiquement.
-              </p>
+          {/* ── STEP 2: Identify users ── */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex-shrink-0">2</span>
+              <h3 className="font-semibold text-gray-900">Identifie tes utilisateurs</h3>
+            </div>
 
-              {apiKey ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 font-mono text-sm text-gray-700 truncate">
-                    {apiKey}
-                  </div>
-                  <Button
-                    variant="secondary"
-                    onClick={() => copyToClipboard(apiKey, 'api-key')}
-                    className="flex-shrink-0"
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm text-gray-600 mb-4">
+                  Pour que les agents sachent <strong>quel client</strong> fait quelle action, il faut identifier l{"'"}utilisateur quand il se connecte sur ton site. Choisis la méthode qui correspond à tes données :
+                </p>
+
+                <div className="space-y-2 mb-4">
+                  <label
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      identifyMethod === 'email' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setIdentifyMethod('email')}
                   >
-                    {copiedSnippet === 'api-key' ? (
-                      <span className="flex items-center gap-1.5 text-green-600">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Copié
-                      </span>
+                    <input type="radio" name="identify" checked={identifyMethod === 'email'} onChange={() => setIdentifyMethod('email')} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Par email</span>
+                      <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded">recommandé</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Tu connais l{"'"}email de tes utilisateurs connectés. C{"'"}est le même email que dans Stripe, donc le lien se fait automatiquement.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      identifyMethod === 'stripe' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setIdentifyMethod('stripe')}
+                  >
+                    <input type="radio" name="identify" checked={identifyMethod === 'stripe'} onChange={() => setIdentifyMethod('stripe')} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Par Stripe Customer ID</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Tu as accès au Stripe Customer ID (cus_xxx) de tes utilisateurs dans ton code.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      identifyMethod === 'userId' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setIdentifyMethod('userId')}
+                  >
+                    <input type="radio" name="identify" checked={identifyMethod === 'userId'} onChange={() => setIdentifyMethod('userId')} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Par ton propre User ID</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Tu as un identifiant unique pour chaque utilisateur dans ta base de données.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {identifyMethod && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Ajoute cette ligne dans ton site, <strong>juste après que l{"'"}utilisateur se connecte</strong> :
+                    </p>
+                    <div className="relative">
+                      <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                        <code>{identifySnippet}</code>
+                      </pre>
+                      <button
+                        onClick={() => copyToClipboard(identifySnippet, 'identify')}
+                        className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                      >
+                        {copiedSnippet === 'identify' ? 'Copié !' : 'Copier'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── STEP 3: Track features ── */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex-shrink-0">3</span>
+              <div>
+                <h3 className="font-semibold text-gray-900">Suivi des features</h3>
+                <span className="text-xs text-gray-500">optionnel mais recommandé</span>
+              </div>
+            </div>
+
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm text-gray-600 mb-1">
+                  Indique quand un utilisateur <strong>utilise une feature</strong> de ton produit. Tes agents sauront exactement ce que chaque client utilise (ou pas) pour personnaliser leurs messages.
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Sélectionne les features que tu veux suivre, puis copie le code généré.
+                </p>
+
+                {allFeatures.length > 0 ? (
+                  <>
+                    {/* Feature toggles */}
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4">
+                      {products.map(product => (
+                        <div key={product.id}>
+                          {products.length > 1 && (
+                            <div className="px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                              {product.name}
+                            </div>
+                          )}
+                          {(product.product_feature || []).map(feature => (
+                            <label
+                              key={feature.id}
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedFeatures.has(feature.feature_key)}
+                                onChange={() => toggleFeature(feature.feature_key)}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-gray-900">{feature.name}</span>
+                                <span className="ml-2 text-xs text-gray-400 font-mono">{feature.feature_key}</span>
+                              </div>
+                              {feature.is_core && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">core</span>
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Generated code */}
+                    {selectedFeatures.size > 0 ? (
+                      <div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Ajoute ces lignes dans ton code, <strong>au moment où l{"'"}utilisateur utilise chaque feature</strong> :
+                        </p>
+                        <div className="relative">
+                          <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                            <code>{featureSnippet}</code>
+                          </pre>
+                          <button
+                            onClick={() => copyToClipboard(featureSnippet, 'features')}
+                            className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                          >
+                            {copiedSnippet === 'features' ? 'Copié !' : 'Copier'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Par exemple, si la feature est &ldquo;export_pdf&rdquo;, place <code className="bg-gray-100 px-1 rounded">AboAnalytics.feature(&apos;export_pdf&apos;)</code> dans le code qui s{"'"}exécute quand l{"'"}utilisateur clique sur le bouton d{"'"}export PDF.
+                        </p>
+                      </div>
                     ) : (
-                      <span className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                        </svg>
-                        Copier
-                      </span>
+                      <p className="text-sm text-gray-400 italic">
+                        Sélectionne au moins une feature ci-dessus pour générer le code.
+                      </p>
                     )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={handleGenerateKey}
-                    disabled={generatingKey}
-                    className="flex-shrink-0 text-gray-500"
-                  >
-                    {generatingKey ? 'Génération...' : 'Régénérer'}
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={handleGenerateKey} disabled={generatingKey}>
-                  {generatingKey ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex gap-3">
+                      <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Génération...
-                    </span>
-                  ) : 'Générer une clé API'}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium mb-1">Aucune feature configurée</p>
+                        <p>
+                          Commence par configurer tes produits et features dans le{' '}
+                          <a href="/dashboard/brand-lab" className="underline font-medium hover:text-amber-900">Brand Lab</a>.
+                          Le SDK utilisera ces features pour le tracking.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-          {/* SDK Installation */}
-          <Card className="mb-4">
-            <CardContent className="p-6">
-              <h3 className="font-medium text-gray-900 mb-4">Installation du SDK</h3>
+                {/* HTML attribute tracking */}
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <details className="group">
+                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+                      <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      Alternative sans code : tracking par attribut HTML
+                    </summary>
+                    <div className="mt-3 ml-6 text-sm text-gray-600">
+                      <p className="mb-2">
+                        Tu peux aussi tracker les clics sur des boutons <strong>sans écrire de JavaScript</strong>. Ajoute simplement l{"'"}attribut <code className="bg-gray-100 px-1 rounded text-xs font-mono">data-abo-track</code> sur n{"'"}importe quel bouton ou lien :
+                      </p>
+                      <div className="relative">
+                        <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-[13px] overflow-x-auto">
+                          <code>{`<!-- Le SDK détecte automatiquement les clics sur ces éléments -->
+<button data-abo-track="export_pdf">Exporter en PDF</button>
+<a data-abo-track="upgrade_pro" href="/pricing">Passer en Pro</a>`}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Tab selector */}
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4">
-                <button
-                  onClick={() => setActiveTab('browser')}
-                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === 'browser'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                    Navigateur (JS)
-                  </span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('nodejs')}
-                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === 'nodejs'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                    </svg>
-                    Backend (Node.js)
-                  </span>
-                </button>
-              </div>
+          {/* ── OPTIONAL: Backend SDK ── */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowBackend(!showBackend)}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <svg className={`w-4 h-4 transition-transform ${showBackend ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="font-medium">Optionnel : envoyer des événements depuis ton backend (Node.js)</span>
+            </button>
 
-              {activeTab === 'browser' ? (
-                <div>
+            {showBackend && (
+              <Card className="mt-3">
+                <CardContent className="p-5">
                   <p className="text-sm text-gray-600 mb-3">
-                    Colle ce snippet dans le <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">&lt;head&gt;</code> ou avant la fermeture du <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">&lt;/body&gt;</code> de ton site :
+                    Si tu veux envoyer des événements depuis ton serveur (par exemple quand un utilisateur effectue une action côté backend), utilise ce code :
                   </p>
                   <div className="relative">
-                    <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto leading-relaxed">
-                      <code>{browserSnippet}</code>
+                    <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                      <code>{backendSnippet}</code>
                     </pre>
                     <button
-                      onClick={() => copyToClipboard(browserSnippet, 'browser')}
+                      onClick={() => copyToClipboard(backendSnippet, 'backend')}
                       className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
                     >
-                      {copiedSnippet === 'browser' ? 'Copié !' : 'Copier'}
+                      {copiedSnippet === 'backend' ? 'Copié !' : 'Copier'}
                     </button>
                   </div>
-                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Le SDK collecte automatiquement :</h4>
-                    <ul className="text-sm text-gray-600 space-y-1.5">
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Pages visitées (+ navigation SPA)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Clics sur liens et boutons
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Profondeur de scroll
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Sessions (début, fin, durée)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Appareil, navigateur, OS
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Utilise ce code dans ton backend Node.js pour envoyer des événements serveur :
-                  </p>
-                  <div className="relative">
-                    <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto leading-relaxed">
-                      <code>{nodejsSnippet}</code>
-                    </pre>
-                    <button
-                      onClick={() => copyToClipboard(nodejsSnippet, 'nodejs')}
-                      className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
-                    >
-                      {copiedSnippet === 'nodejs' ? 'Copié !' : 'Copier'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-          {/* Feature tracking & Custom events */}
-          <Card className="mb-4">
-            <CardContent className="p-6">
-              <h3 className="font-medium text-gray-900 mb-2">Tracking avancé : Features & Événements custom</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                En plus du tracking automatique, tu peux envoyer des événements manuels pour suivre l{"'"}utilisation des features configurées dans le Brand Lab :
-              </p>
-              <div className="relative">
-                <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto leading-relaxed">
-                  <code>{featureTrackingSnippet}</code>
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(featureTrackingSnippet, 'features')}
-                  className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
-                >
-                  {copiedSnippet === 'features' ? 'Copié !' : 'Copier'}
-                </button>
-              </div>
-
-              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <div className="text-sm text-amber-800">
-                    <p className="font-medium mb-1">Noms des features</p>
-                    <p>Utilise les mêmes noms de features que ceux configurés dans ton Brand Lab (feature_key). Les agents utiliseront ces données pour personnaliser leurs communications.</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Identification guide */}
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-medium text-gray-900 mb-2">Identification des utilisateurs</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Le SDK supporte 3 méthodes d{"'"}identification. Utilise celle qui correspond à tes données :
-              </p>
-
-              <div className="grid gap-3">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">email</span>
-                    <span className="text-sm font-medium text-gray-800">Par email</span>
-                    <span className="text-xs text-gray-500">(recommandé)</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    L{"'"}email est automatiquement relié au subscriber Stripe. Idéal si tu connais l{"'"}email de l{"'"}utilisateur connecté.
-                  </p>
-                  <code className="block mt-2 text-xs bg-gray-100 px-3 py-1.5 rounded text-gray-700">
-                    {`AboAnalytics.identify({ email: 'user@example.com' })`}
-                  </code>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">stripeCustomerId</span>
-                    <span className="text-sm font-medium text-gray-800">Par Stripe Customer ID</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Utilise l{"'"}ID client Stripe si disponible côté serveur. Correspondance directe avec les subscribers.
-                  </p>
-                  <code className="block mt-2 text-xs bg-gray-100 px-3 py-1.5 rounded text-gray-700">
-                    {`AboAnalytics.identify({ stripeCustomerId: 'cus_xxx' })`}
-                  </code>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">userId</span>
-                    <span className="text-sm font-medium text-gray-800">Par User ID custom</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Ton propre identifiant utilisateur. Utile pour le tracking backend quand tu n{"'"}as ni email ni Stripe ID.
-                  </p>
-                  <code className="block mt-2 text-xs bg-gray-100 px-3 py-1.5 rounded text-gray-700">
-                    {`AboAnalytics.identify({ userId: 'user_123' })`}
-                  </code>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
