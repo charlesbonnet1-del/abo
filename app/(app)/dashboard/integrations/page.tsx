@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TimeAgo } from '@/components/ui/TimeAgo';
+import IntegrationChatbot from '@/components/ui/IntegrationChatbot';
 
 interface UserData {
   stripe_connected: boolean;
@@ -666,6 +667,9 @@ await fetch('${appUrl}/api/sdk/events', {
 
         </div>
       </div>
+
+      {/* Chatbot d'aide à l'intégration */}
+      <IntegrationChatbot />
     </div>
   );
 }
