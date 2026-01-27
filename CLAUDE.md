@@ -42,7 +42,9 @@ Abo is a SaaS platform that helps subscription businesses reduce churn and incre
 
 The Integration Chatbot is a Groq-powered assistant on the Integrations page (`/dashboard/integrations`) that helps non-technical users install and configure the Abo SDK.
 
-**RULE: The `SYSTEM_PROMPT` in `/app/api/sdk/chat/route.ts` MUST be updated whenever any of the following changes occur:**
+**RULE 1: The `SYSTEM_PROMPT` MUST NEVER exceed 1200 words.** Beyond that, the model loses focus and the responses degrade. Every update must stay within this budget. Cut the least critical information first.
+
+**RULE 2: The `SYSTEM_PROMPT` in `/app/api/sdk/chat/route.ts` MUST be updated whenever any of the following changes occur:**
 
 1. **SDK changes**: Any modification to `public/abo-analytics.js` (new tracking methods, API changes, new auto-tracked events, configuration options)
 2. **API endpoint changes**: Modifications to `/api/sdk/events` or `/api/sdk/api-key` (new parameters, changed authentication, new response formats)
