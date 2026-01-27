@@ -181,13 +181,16 @@ export default function IntegrationsPage() {
 </script>`;
 
   const identifySnippet = identifyMethod === 'email'
-    ? `// Après la connexion de l'utilisateur, ajoute :
+    ? `// Place ce code sur une page où l'utilisateur est connecté
+// (ex : tableau de bord, espace client, page profil)
 AboAnalytics.identify({ email: utilisateur.email });`
     : identifyMethod === 'stripe'
-    ? `// Après la connexion, si tu as le Stripe ID :
+    ? `// Place ce code sur une page où l'utilisateur est connecté
+// (ex : tableau de bord, espace client, page profil)
 AboAnalytics.identify({ stripeCustomerId: utilisateur.stripeId });`
     : identifyMethod === 'userId'
-    ? `// Après la connexion de l'utilisateur, ajoute :
+    ? `// Place ce code sur une page où l'utilisateur est connecté
+// (ex : tableau de bord, espace client, page profil)
 AboAnalytics.identify({ userId: utilisateur.id });`
     : '';
 
@@ -197,7 +200,7 @@ AboAnalytics.identify({ userId: utilisateur.id });`
   });
 
   const featureSnippet = featureSnippetLines.length > 0
-    ? `// Appelle ces lignes quand l'utilisateur utilise la feature :\n${featureSnippetLines.join('\n')}`
+    ? `// Place chaque ligne là où la feature est déclenchée dans ton code :\n${featureSnippetLines.join('\n')}`
     : '';
 
   const backendSnippet = `// Code serveur (Node.js) - Envoie des événements depuis ton backend
@@ -486,7 +489,7 @@ await fetch('${appUrl}/api/sdk/events', {
                 {identifyMethod && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">
-                      Ajoute cette ligne dans ton site, <strong>juste après que l{"'"}utilisateur se connecte</strong> :
+                      Place ce code <strong>sur une page où l{"'"}utilisateur est connecté</strong> (tableau de bord, espace client, page profil...). Il suffit qu{"'"}il s{"'"}exécute une fois pour qu{"'"}Abo reconnaisse l{"'"}utilisateur :
                     </p>
                     <div className="relative">
                       <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
@@ -517,12 +520,17 @@ await fetch('${appUrl}/api/sdk/events', {
 
             <Card>
               <CardContent className="p-5">
-                <p className="text-sm text-gray-600 mb-1">
-                  Indique quand un utilisateur <strong>utilise une feature</strong> de ton produit. Tes agents sauront exactement ce que chaque client utilise (ou pas) pour personnaliser leurs messages.
-                </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Sélectionne les features que tu veux suivre, puis copie le code généré.
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm font-medium text-blue-900 mb-2">Comment ça marche ?</p>
+                  <ol className="text-sm text-blue-800 space-y-1.5 list-decimal list-inside">
+                    <li>Les features ci-dessous sont celles que tu as configurées dans le <a href="/dashboard/brand-lab" className="underline font-medium">Brand Lab</a></li>
+                    <li>Coche celles que tu veux suivre</li>
+                    <li>Copie le code généré et place chaque ligne <strong>à l{"'"}endroit de ton site où la feature est utilisée</strong></li>
+                  </ol>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Tes agents sauront exactement ce que chaque client utilise (ou pas) et personnaliseront leurs messages en conséquence.
+                  </p>
+                </div>
 
                 {allFeatures.length > 0 ? (
                   <>
@@ -563,7 +571,7 @@ await fetch('${appUrl}/api/sdk/events', {
                     {selectedFeatures.size > 0 ? (
                       <div>
                         <p className="text-sm text-gray-600 mb-2">
-                          Ajoute ces lignes dans ton code, <strong>au moment où l{"'"}utilisateur utilise chaque feature</strong> :
+                          Copie ce code. Chaque ligne doit être placée <strong>dans le code de ton site, à l{"'"}endroit où la feature correspondante est déclenchée</strong> :
                         </p>
                         <div className="relative">
                           <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
@@ -576,9 +584,12 @@ await fetch('${appUrl}/api/sdk/events', {
                             {copiedSnippet === 'features' ? 'Copié !' : 'Copier'}
                           </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Par exemple, si la feature est &ldquo;export_pdf&rdquo;, place <code className="bg-gray-100 px-1 rounded">AboAnalytics.feature(&apos;export_pdf&apos;)</code> dans le code qui s{"'"}exécute quand l{"'"}utilisateur clique sur le bouton d{"'"}export PDF.
-                        </p>
+                        <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs font-medium text-gray-700 mb-1.5">Exemple concret :</p>
+                          <p className="text-xs text-gray-600">
+                            Si tu as une feature <code className="bg-gray-100 px-1 rounded">export_pdf</code>, place la ligne <code className="bg-gray-100 px-1 rounded">AboAnalytics.feature(&apos;export_pdf&apos;)</code> dans la fonction qui s{"'"}exécute quand l{"'"}utilisateur clique sur ton bouton &ldquo;Exporter en PDF&rdquo;. Abo saura alors que ce client utilise cette feature.
+                          </p>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-gray-400 italic">
