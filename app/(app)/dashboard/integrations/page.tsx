@@ -363,8 +363,13 @@ await fetch('${appUrl}/api/sdk/events', {
             <Card>
               <CardContent className="p-5">
                 <p className="text-sm text-gray-600 mb-3">
-                  Demande à ton développeur (ou fais-le toi-même) de coller ce code sur <strong>toutes les pages</strong> de ton site, juste avant la balise <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">&lt;/body&gt;</code> :
+                  Colle ce code <strong>une seule fois</strong> dans le fichier principal de ton site. Il sera automatiquement chargé sur toutes les pages :
                 </p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-xs text-gray-600 space-y-1">
+                  <p><strong>Next.js / React :</strong> dans ton fichier <code className="bg-gray-100 px-1 rounded">layout.tsx</code> (racine)</p>
+                  <p><strong>WordPress :</strong> via un plugin Header/Footer (ex: WPCode) ou dans <code className="bg-gray-100 px-1 rounded">footer.php</code></p>
+                  <p><strong>HTML classique :</strong> dans ton template commun ou fichier <code className="bg-gray-100 px-1 rounded">footer.html</code></p>
+                </div>
                 <div className="relative">
                   <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
                     <code>{browserSnippet}</code>
