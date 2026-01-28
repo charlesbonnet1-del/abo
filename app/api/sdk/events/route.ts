@@ -1,28 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-
-interface SDKEvent {
-  type: string;
-  name?: string;
-  data?: Record<string, unknown>;
-  url?: string;
-  title?: string;
-  path?: string;
-  referrer?: string;
-  sessionId?: string;
-  visitorId?: string;
-  email?: string;
-  stripeCustomerId?: string;
-  userId?: string;
-  device?: {
-    type?: string;
-    browser?: string;
-    os?: string;
-    screenWidth?: number;
-    screenHeight?: number;
-  };
-  timestamp?: string;
-}
+import { sdkEventsSchema, SDKEvent, validate } from '@/lib/validation';
+import { logger, ErrorCode } from '@/lib/errors';
+import { secureCompare } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   // CORS headers
@@ -76,23 +56,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const events: SDKEvent[] = Array.isArray(body.events) ? body.events : [body];
-
-    if (events.length === 0) {
+    // Parse and validate body with Zod
+    let body;
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: 'No events provided' },
+        { error: 'Corps JSON invalide' },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    // Limit batch size
-    if (events.length > 100) {
+    // Normalize to array format
+    const eventsPayload = Array.isArray(body.events) ? body : { events: [body] };
+
+    const validation = validate(sdkEventsSchema, eventsPayload);
+    if (!validation.success) {
+      logger.warn('SDK events validation failed', {
+        userId,
+        details: validation.details,
+      });
       return NextResponse.json(
-        { error: 'Maximum 100 events per batch' },
+        {
+          error: 'Donnees invalides',
+          details: validation.details.map((d) => ({
+            field: d.path.join('.'),
+            message: d.message,
+          })),
+        },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
+
+    const events: SDKEvent[] = validation.data.events;
 
     // Try to resolve subscriber for each event
     const resolvedEvents = await Promise.all(
@@ -152,9 +148,13 @@ export async function POST(request: NextRequest) {
       .insert(resolvedEvents);
 
     if (insertError) {
-      console.error('SDK event insert error:', insertError);
+      logger.error('SDK event insert error', {
+        userId,
+        errorCode: insertError.code,
+        errorMessage: insertError.message,
+      });
       return NextResponse.json(
-        { error: 'Failed to store events' },
+        { error: 'Erreur lors de l\'enregistrement des evenements' },
         { status: 500, headers: corsHeaders(origin) }
       );
     }
@@ -164,9 +164,11 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders(origin) }
     );
   } catch (error) {
-    console.error('SDK events error:', error);
+    logger.error('SDK events error', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erreur interne du serveur' },
       { status: 500, headers: corsHeaders(request.headers.get('origin') || '*') }
     );
   }

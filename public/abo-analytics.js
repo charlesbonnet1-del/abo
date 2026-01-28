@@ -19,6 +19,10 @@
   var SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
   var STORAGE_KEY = 'abo_analytics';
   var VISITOR_KEY = 'abo_visitor_id';
+  var IDB_NAME = 'abo_analytics_db';
+  var IDB_STORE = 'failed_events';
+  var MAX_RETRY_ATTEMPTS = 5;
+  var BASE_RETRY_DELAY = 1000; // 1 second
 
   var config = {
     apiKey: null,
@@ -41,6 +45,9 @@
     timer: null,
     maxScrollDepth: 0,
     lastActivity: null,
+    retryTimer: null,
+    isOnline: navigator.onLine !== false,
+    db: null,
   };
 
   // ── Utilities ──
@@ -146,6 +153,186 @@
     }
   }
 
+  // ── IndexedDB for offline persistence ──
+
+  function openDatabase() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) {
+        log('IndexedDB not supported');
+        resolve(null);
+        return;
+      }
+
+      var request = indexedDB.open(IDB_NAME, 1);
+
+      request.onerror = function () {
+        log('IndexedDB open error');
+        resolve(null);
+      };
+
+      request.onsuccess = function (event) {
+        state.db = event.target.result;
+        log('IndexedDB opened');
+        resolve(state.db);
+      };
+
+      request.onupgradeneeded = function (event) {
+        var db = event.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          var store = db.createObjectStore(IDB_STORE, { keyPath: 'id', autoIncrement: true });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      };
+    });
+  }
+
+  function saveToIndexedDB(events, retryCount) {
+    if (!state.db) return Promise.resolve();
+
+    return new Promise(function (resolve) {
+      try {
+        var transaction = state.db.transaction([IDB_STORE], 'readwrite');
+        var store = transaction.objectStore(IDB_STORE);
+
+        var record = {
+          events: events,
+          retryCount: retryCount || 0,
+          timestamp: Date.now(),
+        };
+
+        store.add(record);
+
+        transaction.oncomplete = function () {
+          log('Events saved to IndexedDB for retry');
+          resolve();
+        };
+
+        transaction.onerror = function () {
+          log('Error saving to IndexedDB');
+          resolve();
+        };
+      } catch (e) {
+        log('IndexedDB save error:', e);
+        resolve();
+      }
+    });
+  }
+
+  function loadFromIndexedDB() {
+    if (!state.db) return Promise.resolve([]);
+
+    return new Promise(function (resolve) {
+      try {
+        var transaction = state.db.transaction([IDB_STORE], 'readonly');
+        var store = transaction.objectStore(IDB_STORE);
+        var request = store.getAll();
+
+        request.onsuccess = function () {
+          resolve(request.result || []);
+        };
+
+        request.onerror = function () {
+          resolve([]);
+        };
+      } catch (e) {
+        resolve([]);
+      }
+    });
+  }
+
+  function deleteFromIndexedDB(id) {
+    if (!state.db) return Promise.resolve();
+
+    return new Promise(function (resolve) {
+      try {
+        var transaction = state.db.transaction([IDB_STORE], 'readwrite');
+        var store = transaction.objectStore(IDB_STORE);
+        store.delete(id);
+
+        transaction.oncomplete = function () {
+          resolve();
+        };
+
+        transaction.onerror = function () {
+          resolve();
+        };
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+
+  function updateRetryCount(id, retryCount) {
+    if (!state.db) return Promise.resolve();
+
+    return new Promise(function (resolve) {
+      try {
+        var transaction = state.db.transaction([IDB_STORE], 'readwrite');
+        var store = transaction.objectStore(IDB_STORE);
+        var request = store.get(id);
+
+        request.onsuccess = function () {
+          var record = request.result;
+          if (record) {
+            record.retryCount = retryCount;
+            store.put(record);
+          }
+          resolve();
+        };
+
+        request.onerror = function () {
+          resolve();
+        };
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+
+  // ── Retry with exponential backoff ──
+
+  function calculateBackoffDelay(retryCount) {
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    return Math.min(BASE_RETRY_DELAY * Math.pow(2, retryCount), 30000);
+  }
+
+  function retryFailedEvents() {
+    if (!state.isOnline) {
+      log('Offline, skipping retry');
+      return;
+    }
+
+    loadFromIndexedDB().then(function (records) {
+      if (records.length === 0) return;
+
+      log('Retrying', records.length, 'failed batches');
+
+      records.forEach(function (record) {
+        if (record.retryCount >= MAX_RETRY_ATTEMPTS) {
+          log('Max retries reached, discarding batch');
+          deleteFromIndexedDB(record.id);
+          return;
+        }
+
+        var delay = calculateBackoffDelay(record.retryCount);
+        log('Retrying batch in', delay, 'ms (attempt', record.retryCount + 1, ')');
+
+        setTimeout(function () {
+          sendWithRetry(record.events, record.retryCount + 1, record.id);
+        }, delay);
+      });
+    });
+  }
+
+  function scheduleRetry() {
+    if (state.retryTimer) return;
+
+    state.retryTimer = setTimeout(function () {
+      state.retryTimer = null;
+      retryFailedEvents();
+    }, 10000); // Check for retries every 10s
+  }
+
   // ── Core tracking ──
 
   function trackEvent(type, name, data) {
@@ -184,47 +371,89 @@
     if (state.queue.length === 0 || !config.apiKey) return;
 
     var events = state.queue.splice(0, MAX_BATCH_SIZE);
-    var endpoint = config.endpoint || API_ENDPOINT;
 
-    log('Flushing', events.length, 'events to', endpoint);
-
-    var payload = JSON.stringify({ events: events });
-
-    // Use sendBeacon if available (for page unload), otherwise fetch
-    if (typeof navigator.sendBeacon === 'function' && events.length <= 10) {
-      var blob = new Blob([payload], { type: 'application/json' });
-      var headers = new Headers({ 'x-abo-key': config.apiKey });
-      // sendBeacon doesn't support custom headers, so we fallback to fetch
-      sendViaFetch(endpoint, payload);
-    } else {
-      sendViaFetch(endpoint, payload);
+    if (!state.isOnline) {
+      log('Offline, saving events to IndexedDB');
+      saveToIndexedDB(events, 0);
+      return;
     }
+
+    sendWithRetry(events, 0, null);
   }
 
-  function sendViaFetch(endpoint, payload) {
-    try {
-      fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-abo-key': config.apiKey,
-        },
-        body: payload,
-        keepalive: true,
-      })
-        .then(function (response) {
-          if (!response.ok) {
-            log('Failed to send events:', response.status);
-          } else {
-            log('Events sent successfully');
+  function sendWithRetry(events, retryCount, existingRecordId) {
+    var endpoint = config.endpoint || API_ENDPOINT;
+    var payload = JSON.stringify({ events: events });
+
+    log('Sending', events.length, 'events to', endpoint);
+
+    fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-abo-key': config.apiKey,
+      },
+      body: payload,
+      keepalive: true,
+    })
+      .then(function (response) {
+        if (response.ok) {
+          log('Events sent successfully');
+          // Remove from IndexedDB if this was a retry
+          if (existingRecordId) {
+            deleteFromIndexedDB(existingRecordId);
           }
-        })
-        .catch(function (err) {
-          log('Error sending events:', err);
-        });
-    } catch (e) {
-      log('Error sending events:', e);
+        } else if (response.status >= 500) {
+          // Server error, save for retry
+          log('Server error', response.status, ', saving for retry');
+          handleSendFailure(events, retryCount, existingRecordId);
+        } else {
+          // Client error (4xx), don't retry
+          log('Client error', response.status, ', not retrying');
+          if (existingRecordId) {
+            deleteFromIndexedDB(existingRecordId);
+          }
+        }
+      })
+      .catch(function (err) {
+        log('Network error:', err.message);
+        handleSendFailure(events, retryCount, existingRecordId);
+      });
+  }
+
+  function handleSendFailure(events, retryCount, existingRecordId) {
+    if (retryCount >= MAX_RETRY_ATTEMPTS) {
+      log('Max retries reached, discarding events');
+      if (existingRecordId) {
+        deleteFromIndexedDB(existingRecordId);
+      }
+      return;
     }
+
+    if (existingRecordId) {
+      // Update retry count in existing record
+      updateRetryCount(existingRecordId, retryCount);
+    } else {
+      // Save new record
+      saveToIndexedDB(events, retryCount);
+    }
+
+    scheduleRetry();
+  }
+
+  // ── Online/Offline handling ──
+
+  function handleOnline() {
+    log('Back online');
+    state.isOnline = true;
+    // Immediately try to send any pending events
+    flush();
+    retryFailedEvents();
+  }
+
+  function handleOffline() {
+    log('Gone offline');
+    state.isOnline = false;
   }
 
   // ── Auto-tracking setup ──
@@ -261,7 +490,7 @@
           var el = target;
           var maxDepth = 5;
           while (el && maxDepth > 0) {
-            if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.getAttribute && el.getAttribute('data-abo-track')) {
+            if (el.tagName === 'A' || el.tagName === 'BUTTON' || (el.getAttribute && el.getAttribute('data-abo-track'))) {
               break;
             }
             el = el.parentElement;
@@ -385,6 +614,15 @@
       state.visitorId = getVisitorId();
       getSessionId();
 
+      // Initialize IndexedDB and retry failed events
+      openDatabase().then(function () {
+        retryFailedEvents();
+      });
+
+      // Listen for online/offline events
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
       // Start batch timer
       state.timer = setInterval(flush, BATCH_INTERVAL);
 
@@ -459,6 +697,13 @@
       }
       state.visitorId = getVisitorId();
       log('Reset');
+    },
+
+    /**
+     * Get pending event count (for debugging)
+     */
+    getPendingCount: function () {
+      return state.queue.length;
     },
   };
 
