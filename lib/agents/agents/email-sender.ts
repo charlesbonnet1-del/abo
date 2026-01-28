@@ -130,15 +130,18 @@ async function generateEmailContent(params: {
 
   try {
     const groq = getGroq();
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-    });
+    const response = await groq.chat.completions.create(
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      },
+      { signal: AbortSignal.timeout(30000) }
+    );
 
     return parseEmailResponse(response.choices[0].message.content || '');
   } catch (error) {
