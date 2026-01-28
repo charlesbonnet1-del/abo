@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { sendExpirationNotification } from '@/lib/agents/resend';
 import { expireOldOpportunities } from '@/lib/agents/conversion';
+import { verifyCronSecret } from '@/lib/security';
 
 // Lazy initialization for admin client
 let supabaseAdmin: SupabaseClient | null = null;
@@ -73,9 +74,9 @@ async function processExpiredActions(): Promise<{ expired: number; notified: num
 }
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret
+  // Verify cron secret with constant-time comparison
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(authHeader)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

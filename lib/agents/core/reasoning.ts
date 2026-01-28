@@ -445,15 +445,18 @@ export class AgentReasoning {
     );
 
     const groq = getGroq();
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: this.getOptionsSystemPrompt(brandSettings) },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
+    const response = await groq.chat.completions.create(
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: this.getOptionsSystemPrompt(brandSettings) },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      },
+      { signal: AbortSignal.timeout(30000) }
+    );
 
     const options = this.parseOptionsResponse(response.choices[0].message.content || '');
 
@@ -624,15 +627,18 @@ Réponds UNIQUEMENT en JSON avec ce format:
     );
 
     const groq = getGroq();
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: this.getEvaluationSystemPrompt() },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3, // Plus déterministe pour l'évaluation
-      max_tokens: 2000,
-    });
+    const response = await groq.chat.completions.create(
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: this.getEvaluationSystemPrompt() },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.3, // Plus déterministe pour l'évaluation
+        max_tokens: 2000,
+      },
+      { signal: AbortSignal.timeout(30000) }
+    );
 
     const evaluatedOptions = this.parseEvaluationResponse(
       response.choices[0].message.content || '',

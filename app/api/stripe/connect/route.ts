@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/supabase/server';
+import { createSignedState } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,8 @@ export async function GET() {
 
   const redirectUri = `${appUrl}/api/stripe/callback`;
 
-  // Encode user ID in state for security
-  const state = Buffer.from(JSON.stringify({ userId: user.id })).toString('base64');
+  // Create HMAC-signed state to prevent CSRF attacks
+  const state = createSignedState({ userId: user.id, ts: Date.now() });
 
   const stripeConnectUrl = new URL('https://connect.stripe.com/oauth/authorize');
   stripeConnectUrl.searchParams.set('response_type', 'code');

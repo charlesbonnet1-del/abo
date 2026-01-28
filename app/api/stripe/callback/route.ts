@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, getUser } from '@/lib/supabase/server';
+import { verifySignedState } from '@/lib/security';
 import Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
+  const stateParam = searchParams.get('state');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
@@ -24,10 +26,32 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appUrl}/settings?error=missing_code`);
   }
 
-  // Verify the user is logged in
+  // Verify the signed state parameter to prevent CSRF
+  if (!stateParam) {
+    return NextResponse.redirect(`${appUrl}/settings?error=missing_state`);
+  }
+
+  const stateData = verifySignedState<{ userId: string; ts: number }>(stateParam);
+  if (!stateData) {
+    console.error('Invalid OAuth state signature');
+    return NextResponse.redirect(`${appUrl}/settings?error=invalid_state`);
+  }
+
+  // Check state is not too old (1 hour max)
+  const stateAge = Date.now() - (stateData.ts || 0);
+  if (stateAge > 60 * 60 * 1000) {
+    return NextResponse.redirect(`${appUrl}/settings?error=state_expired`);
+  }
+
+  // Verify the user is logged in and matches the state
   const user = await getUser();
   if (!user) {
     return NextResponse.redirect(`${appUrl}/login`);
+  }
+
+  if (user.id !== stateData.userId) {
+    console.error('User ID mismatch in OAuth state');
+    return NextResponse.redirect(`${appUrl}/settings?error=user_mismatch`);
   }
 
   console.log('Processing Stripe callback for user:', user.id);

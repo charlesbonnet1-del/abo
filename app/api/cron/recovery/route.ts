@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processRecoverySequences } from '@/lib/agents/recovery';
+import { verifyCronSecret } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret
+  // Verify cron secret with constant-time comparison
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(authHeader)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -173,21 +173,24 @@ export class AgentLearning {
 
       const prompt = this.buildLessonsPrompt(situation, actionTaken, outcome, outcomeDetails);
 
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: this.getLessonsSystemPrompt(),
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 1000,
-      });
+      const response = await groq.chat.completions.create(
+        {
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            {
+              role: 'system',
+              content: this.getLessonsSystemPrompt(),
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 1000,
+        },
+        { signal: AbortSignal.timeout(30000) }
+      );
 
       return this.parseLessonsResponse(response.choices[0].message.content || '');
     } catch (e) {

@@ -63,12 +63,13 @@ async function generateGroqEmbedding(text: string): Promise<number[]> {
     const groq = getGroq();
 
     // Extraire des features sémantiques via le LLM
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'system',
-          content: `Tu es un système d'extraction de features. Analyse le texte et extrais des scores entre 0 et 1 pour ces 20 dimensions:
+    const response = await groq.chat.completions.create(
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `Tu es un système d'extraction de features. Analyse le texte et extrais des scores entre 0 et 1 pour ces 20 dimensions:
 1. urgency (urgence)
 2. sentiment_positive
 3. sentiment_negative
@@ -91,15 +92,17 @@ async function generateGroqEmbedding(text: string): Promise<number[]> {
 20. emotional_intensity
 
 Réponds UNIQUEMENT avec un JSON: {"scores": [0.5, 0.3, ...]} (20 valeurs)`,
-        },
-        {
-          role: 'user',
-          content: text.slice(0, 2000),
-        },
-      ],
-      temperature: 0.1,
-      max_tokens: 200,
-    });
+          },
+          {
+            role: 'user',
+            content: text.slice(0, 2000),
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+      },
+      { signal: AbortSignal.timeout(30000) }
+    );
 
     const content = response.choices[0].message.content || '';
     const match = content.match(/\{[\s\S]*\}/);
