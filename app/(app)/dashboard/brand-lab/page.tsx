@@ -153,6 +153,14 @@ const languages = [
   { value: 'de', label: 'Deutsch' },
 ];
 
+// Product feature from API (Brand Lab v2)
+interface ProductFeatureFromAPI {
+  id: string;
+  name: string;
+  feature_key: string;
+  description_short?: string;
+}
+
 export default function BrandLabPage() {
   const [activeTab, setActiveTab] = useState<Tab>('entreprise');
   const [settings, setSettings] = useState<BrandSettings>(defaultSettings);
@@ -160,6 +168,7 @@ export default function BrandLabPage() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productFeatures, setProductFeatures] = useState<ProductFeatureFromAPI[]>([]);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -201,6 +210,28 @@ export default function BrandLabPage() {
           segment_by_plan: data.segment_by_plan || {},
           plans_metadata: data.plans_metadata || {},
         });
+      }
+
+      // Load product features from Brand Lab v2 (product_feature table)
+      try {
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const productsData = await res.json();
+          const allFeatures: ProductFeatureFromAPI[] = [];
+          for (const product of productsData.products || []) {
+            for (const feat of product.product_feature || []) {
+              allFeatures.push({
+                id: feat.id,
+                name: feat.name,
+                feature_key: feat.feature_key,
+                description_short: feat.description_short,
+              });
+            }
+          }
+          setProductFeatures(allFeatures);
+        }
+      } catch {
+        console.error('Error loading product features');
       }
     } catch (err) {
       console.error('Error:', err);
@@ -539,9 +570,14 @@ export default function BrandLabPage() {
                           className="mt-2 w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
                         >
                           <option value="">Sélectionne une feature</option>
-                          {settings.features.map(f => (
-                            <option key={f.id} value={f.name}>{f.name}</option>
-                          ))}
+                          {productFeatures.length > 0
+                            ? productFeatures.map(f => (
+                                <option key={f.id} value={f.name}>{f.name}</option>
+                              ))
+                            : settings.features.map(f => (
+                                <option key={f.id} value={f.name}>{f.name}</option>
+                              ))
+                          }
                         </select>
                       )}
                     </div>
@@ -689,19 +725,22 @@ export default function BrandLabPage() {
                   value={settings.values}
                   onChange={(value) => updateSettings('values', value)}
                   label="Valeurs de marque (ce qui te définit)"
-                  placeholder="Ex: Transparence, Client first..."
+                  placeholder="Tape + Entrée pour ajouter, ou clique ci-dessous"
+                  suggestions={['Transparence', 'Innovation', 'Client first', 'Simplicité', 'Fiabilité', 'Proximité', 'Excellence', 'Authenticité', 'Réactivité', 'Qualité']}
                 />
                 <TagInput
                   value={settings.never_say}
                   onChange={(value) => updateSettings('never_say', value)}
                   label="Ne jamais dire"
-                  placeholder="Ex: Malheureusement, Cher client..."
+                  placeholder="Tape + Entrée pour ajouter, ou clique ci-dessous"
+                  suggestions={['Malheureusement', 'Cher client', 'Je comprends votre frustration', 'Pas possible', 'On ne peut rien faire', 'Cordialement', 'Suite à votre demande']}
                 />
                 <TagInput
                   value={settings.always_mention}
                   onChange={(value) => updateSettings('always_mention', value)}
                   label="Toujours mentionner"
-                  placeholder="Ex: Support disponible 24/7..."
+                  placeholder="Tape + Entrée pour ajouter, ou clique ci-dessous"
+                  suggestions={['Support disponible 24/7', 'Satisfait ou remboursé', 'Équipe à disposition', 'Aide en ligne', 'Essai gratuit', 'Sans engagement']}
                 />
               </CardContent>
             </Card>

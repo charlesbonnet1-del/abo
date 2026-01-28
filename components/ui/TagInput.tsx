@@ -8,9 +8,10 @@ interface TagInputProps {
   placeholder?: string;
   label?: string;
   maxTags?: number;
+  suggestions?: string[];
 }
 
-export function TagInput({ value, onChange, placeholder = 'Appuyer Entrée pour ajouter', label, maxTags = 10 }: TagInputProps) {
+export function TagInput({ value, onChange, placeholder = 'Appuyer Entrée pour ajouter', label, maxTags = 10, suggestions }: TagInputProps) {
   const [inputValue, setInputValue] = useState('');
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -26,6 +27,12 @@ export function TagInput({ value, onChange, placeholder = 'Appuyer Entrée pour 
 
   const removeTag = (tagToRemove: string) => {
     onChange(value.filter(tag => tag !== tagToRemove));
+  };
+
+  const addSuggestion = (suggestion: string) => {
+    if (!value.includes(suggestion) && value.length < maxTags) {
+      onChange([...value, suggestion]);
+    }
   };
 
   return (
@@ -65,6 +72,28 @@ export function TagInput({ value, onChange, placeholder = 'Appuyer Entrée pour 
           className="w-full outline-none text-sm placeholder-gray-400 disabled:bg-transparent disabled:cursor-not-allowed"
         />
       </div>
+      {suggestions && suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {suggestions.map((s) => {
+            const isSelected = value.includes(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => isSelected ? removeTag(s) : addSuggestion(s)}
+                disabled={!isSelected && value.length >= maxTags}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  isSelected
+                    ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed'
+                }`}
+              >
+                {isSelected ? '✓ ' : '+ '}{s}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
