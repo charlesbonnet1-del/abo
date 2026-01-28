@@ -584,7 +584,7 @@ Réponds UNIQUEMENT en JSON avec ce format:
   private parseOptionsResponse(content: string): ActionOption[] {
     try {
       // Extraire le JSON de la réponse
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = content.match(/\{[\s\S]*?\}/);
       if (!jsonMatch) return [];
 
       const parsed = JSON.parse(jsonMatch[0]);
@@ -752,7 +752,7 @@ Réponds UNIQUEMENT en JSON:
 
   private parseEvaluationResponse(content: string, options: ActionOption[]): EvaluatedOption[] {
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = content.match(/\{[\s\S]*?\}/);
       if (!jsonMatch) {
         // Fallback: scores par défaut
         return options.map((opt, i) => ({

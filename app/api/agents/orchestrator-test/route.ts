@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createOrchestrator, OrchestratorEvent } from '@/lib/agents/agents';
+import { getUser } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
+    // Vérifier l'authentification
+    const authenticatedUser = await getUser();
+    if (!authenticatedUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userId, event } = body as {
       userId: string;
@@ -11,6 +18,11 @@ export async function POST(request: Request) {
 
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+
+    // Valider que l'utilisateur ne peut déclencher des actions que pour lui-même
+    if (userId !== authenticatedUser.id) {
+      return NextResponse.json({ error: 'Non autorisé: userId ne correspond pas à l\'utilisateur connecté' }, { status: 403 });
     }
 
     if (!event || !event.type || !event.subscriberId) {
