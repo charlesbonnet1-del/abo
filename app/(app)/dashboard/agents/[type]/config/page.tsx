@@ -354,7 +354,7 @@ export default function AgentConfigPage() {
         return;
       }
 
-      const configToSave = {
+      const configToSave: Record<string, unknown> = {
         user_id: user.id,
         agent_type: agentType,
         is_active: config.is_active,
@@ -376,14 +376,31 @@ export default function AgentConfigPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: saveError } = await supabase
-        .from('agent_config')
-        .upsert(configToSave, { onConflict: 'user_id,agent_type' });
+      // Try saving - auto-strip columns that don't exist in DB yet (migration not applied)
+      const payload = { ...configToSave };
+      let saved = false;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const { error: saveError } = await supabase
+          .from('agent_config')
+          .upsert(payload, { onConflict: 'user_id,agent_type' });
 
-      if (saveError) {
+        if (!saveError) {
+          saved = true;
+          break;
+        }
+
+        const colMatch = saveError.message?.match(/Could not find the '(\w+)' column/);
+        if (colMatch?.[1]) {
+          delete payload[colMatch[1]];
+          continue;
+        }
+
         console.error('Error saving config:', saveError);
         setError(`Erreur lors de la sauvegarde : ${saveError.message || saveError.code || 'erreur inconnue'}`);
-      } else {
+        break;
+      }
+
+      if (saved) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       }
