@@ -35,6 +35,8 @@ export default function IntegrationsPage() {
 
   // SDK state
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState('');
   const [showBackend, setShowBackend] = useState(false);
@@ -74,10 +76,19 @@ export default function IntegrationsPage() {
       if (count !== null) setSubscriberCount(count);
 
       // Auto-load/generate API key
-      const keyRes = await fetch('/api/sdk/api-key');
-      if (keyRes.ok) {
-        const keyData = await keyRes.json();
-        setApiKey(keyData.apiKey);
+      try {
+        const keyRes = await fetch('/api/sdk/api-key');
+        if (keyRes.ok) {
+          const keyData = await keyRes.json();
+          setApiKey(keyData.apiKey);
+          setApiKeyError(false);
+        } else {
+          console.error('API key fetch failed:', keyRes.status);
+          setApiKeyError(true);
+        }
+      } catch {
+        console.error('API key fetch error');
+        setApiKeyError(true);
       }
 
       // Load Brand Lab features
@@ -135,16 +146,38 @@ export default function IntegrationsPage() {
     }
   };
 
+  const handleGenerateKey = async () => {
+    setApiKeyLoading(true);
+    setApiKeyError(false);
+    try {
+      const res = await fetch('/api/sdk/api-key');
+      if (res.ok) {
+        const data = await res.json();
+        setApiKey(data.apiKey);
+      } else {
+        setApiKeyError(true);
+      }
+    } catch {
+      setApiKeyError(true);
+    } finally {
+      setApiKeyLoading(false);
+    }
+  };
+
   const handleRegenerateKey = async () => {
     if (!confirm('Régénérer la clé invalidera l\'ancienne. Le code sur ton site devra être mis à jour. Continuer ?')) return;
+    setApiKeyLoading(true);
     try {
       const res = await fetch('/api/sdk/api-key', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setApiKey(data.apiKey);
+        setApiKeyError(false);
       }
     } catch (err) {
       console.error('Error regenerating key:', err);
+    } finally {
+      setApiKeyLoading(false);
     }
   };
 
@@ -369,57 +402,85 @@ await fetch('${appUrl}/api/sdk/events', {
                 <p className="text-sm text-gray-600 mb-3">
                   Colle ce code <strong>une seule fois</strong> dans le fichier principal de ton site. Il sera automatiquement chargé sur toutes les pages :
                 </p>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-xs text-gray-600 space-y-1">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-xs text-gray-600 space-y-2">
                   <p><strong>Next.js / React :</strong> dans ton fichier <code className="bg-gray-100 px-1 rounded">layout.tsx</code> (racine)</p>
-                  <p><strong>WordPress :</strong> via un plugin Header/Footer (ex: WPCode) ou dans <code className="bg-gray-100 px-1 rounded">footer.php</code></p>
+                  <div className="flex items-center gap-2">
+                    <p className="flex-1"><strong>WordPress :</strong> télécharge le plugin ci-dessous, ou colle le code via WPCode / <code className="bg-gray-100 px-1 rounded">footer.php</code></p>
+                    <button
+                      onClick={() => window.location.href = '/api/sdk/wp-plugin'}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      Plugin WordPress
+                    </button>
+                  </div>
                   <p><strong>HTML classique :</strong> dans ton template commun ou fichier <code className="bg-gray-100 px-1 rounded">footer.html</code></p>
                 </div>
-                <div className="relative">
-                  <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
-                    <code>{browserSnippet}</code>
-                  </pre>
-                  <button
-                    onClick={() => copyToClipboard(browserSnippet, 'browser')}
-                    className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
-                  >
-                    {copiedSnippet === 'browser' ? 'Copié !' : 'Copier'}
-                  </button>
-                </div>
-
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm font-medium text-green-800 mb-2">Une fois installé, le SDK collecte automatiquement :</p>
-                  <div className="grid grid-cols-2 gap-1.5 text-sm text-green-700">
-                    {['Pages visitées', 'Clics sur boutons', 'Scroll', 'Durée des sessions', 'Appareil & navigateur'].map(item => (
-                      <div key={item} className="flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* API Key info */}
-                {apiKey && (
-                  <div className="mt-4 border-t border-gray-100 pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">Ta clé API (déjà incluse dans le code ci-dessus) :</span>
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-600 max-w-[200px] truncate">{apiKey}</code>
-                        <button
-                          onClick={() => copyToClipboard(apiKey, 'api-key')}
-                          className="text-xs text-blue-600 hover:text-blue-700"
-                        >
-                          {copiedSnippet === 'api-key' ? 'Copié' : 'Copier'}
-                        </button>
-                        <button
-                          onClick={handleRegenerateKey}
-                          className="text-xs text-gray-400 hover:text-gray-600"
-                        >
-                          Régénérer
-                        </button>
+                {!apiKey && apiKeyError ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-amber-800 mb-1">Clé API non disponible</p>
+                        <p className="text-sm text-amber-700 mb-3">La clé API n{"'"}a pas pu être générée. Clique ci-dessous pour réessayer.</p>
+                        <Button onClick={handleGenerateKey} disabled={apiKeyLoading} variant="secondary" className="text-sm">
+                          {apiKeyLoading ? 'Génération...' : 'Générer ma clé API'}
+                        </Button>
                       </div>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                        <code>{browserSnippet}</code>
+                      </pre>
+                      <button
+                        onClick={() => copyToClipboard(browserSnippet, 'browser')}
+                        className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                      >
+                        {copiedSnippet === 'browser' ? 'Copié !' : 'Copier'}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-green-800 mb-2">Une fois installé, le SDK collecte automatiquement :</p>
+                      <div className="grid grid-cols-2 gap-1.5 text-sm text-green-700">
+                        {['Pages visitées', 'Clics sur boutons', 'Scroll', 'Durée des sessions', 'Appareil & navigateur'].map(item => (
+                          <div key={item} className="flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* API Key info */}
+                    {apiKey && (
+                      <div className="mt-4 border-t border-gray-100 pt-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Ta clé API (déjà incluse dans le code ci-dessus) :</span>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-600 max-w-[200px] truncate">{apiKey}</code>
+                            <button
+                              onClick={() => copyToClipboard(apiKey, 'api-key')}
+                              className="text-xs text-blue-600 hover:text-blue-700"
+                            >
+                              {copiedSnippet === 'api-key' ? 'Copié' : 'Copier'}
+                            </button>
+                            <button
+                              onClick={handleRegenerateKey}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Régénérer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -520,22 +581,23 @@ await fetch('${appUrl}/api/sdk/events', {
 
             <Card>
               <CardContent className="p-5">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm font-medium text-blue-900 mb-2">Comment ça marche ?</p>
-                  <ol className="text-sm text-blue-800 space-y-1.5 list-decimal list-inside">
-                    <li>Les features ci-dessous sont celles que tu as configurées dans le <a href="/dashboard/brand-lab" className="underline font-medium">Brand Lab</a></li>
-                    <li>Coche celles que tu veux suivre</li>
-                    <li>Copie le code généré et place chaque ligne <strong>à l{"'"}endroit de ton site où la feature est utilisée</strong></li>
-                  </ol>
-                  <p className="text-xs text-blue-700 mt-2">
-                    Tes agents sauront exactement ce que chaque client utilise (ou pas) et personnaliseront leurs messages en conséquence.
+                {/* Explication claire du concept */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
+                  <p className="text-sm font-medium text-blue-900 mb-2">Pourquoi c{"'"}est important ?</p>
+                  <p className="text-sm text-blue-800 mb-3">
+                    Tes agents IA doivent savoir <strong>quelles fonctionnalités chaque client utilise</strong> pour personnaliser leurs messages. Par exemple, si un client n{"'"}a jamais exporté un rapport, l{"'"}agent d{"'"}onboarding pourra lui envoyer un guide pour cette feature.
+                  </p>
+                  <p className="text-sm font-medium text-blue-900 mb-1">Le principe est simple :</p>
+                  <p className="text-sm text-blue-800">
+                    Tu indiques sur ton site quels boutons/pages correspondent à quelles features. Le SDK fait le reste : il enregistre chaque utilisation et la lie au bon client.
                   </p>
                 </div>
 
                 {allFeatures.length > 0 ? (
                   <>
-                    {/* Feature toggles */}
-                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4">
+                    {/* Feature list */}
+                    <p className="text-sm font-medium text-gray-700 mb-2">Tes features (configurées dans le <a href="/dashboard/brand-lab" className="text-blue-600 underline">Brand Lab</a>) :</p>
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-5">
                       {products.map(product => (
                         <div key={product.id}>
                           {products.length > 1 && (
@@ -567,33 +629,92 @@ await fetch('${appUrl}/api/sdk/events', {
                       ))}
                     </div>
 
-                    {/* Generated code */}
-                    {selectedFeatures.size > 0 ? (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">
-                          Copie ce code. Chaque ligne doit être placée <strong>dans le code de ton site, à l{"'"}endroit où la feature correspondante est déclenchée</strong> :
-                        </p>
-                        <div className="relative">
-                          <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
-                            <code>{featureSnippet}</code>
-                          </pre>
-                          <button
-                            onClick={() => copyToClipboard(featureSnippet, 'features')}
-                            className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
-                          >
-                            {copiedSnippet === 'features' ? 'Copié !' : 'Copier'}
-                          </button>
-                        </div>
-                        <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                          <p className="text-xs font-medium text-gray-700 mb-1.5">Exemple concret :</p>
-                          <p className="text-xs text-gray-600">
-                            Si tu as une feature <code className="bg-gray-100 px-1 rounded">export_pdf</code>, place la ligne <code className="bg-gray-100 px-1 rounded">AboAnalytics.feature(&apos;export_pdf&apos;)</code> dans la fonction qui s{"'"}exécute quand l{"'"}utilisateur clique sur ton bouton &ldquo;Exporter en PDF&rdquo;. Abo saura alors que ce client utilise cette feature.
+                    {selectedFeatures.size > 0 && (
+                      <>
+                        {/* ── Méthode 1 : Sans code (HTML) ── */}
+                        <div className="mb-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded">Méthode 1</span>
+                            <span className="text-sm font-semibold text-gray-900">Sans code — attribut HTML</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">le plus simple</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">
+                            Sur ton site, trouve le bouton ou le lien qui correspond à chaque feature cochée. Ajoute-lui l{"'"}attribut <code className="bg-gray-100 px-1 rounded text-xs font-mono">data-abo-track</code> avec l{"'"}identifiant de la feature. Le SDK détectera automatiquement les clics.
+                          </p>
+
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
+                            <p className="text-xs font-medium text-gray-700 mb-2">Exemple concret — avant / après :</p>
+                            <div className="space-y-2 text-[13px]">
+                              <div>
+                                <span className="text-xs text-gray-500">Avant (ton code actuel) :</span>
+                                <pre className="bg-white border border-gray-200 rounded p-2 mt-1 text-gray-700"><code>{`<button>Exporter en PDF</button>`}</code></pre>
+                              </div>
+                              <div>
+                                <span className="text-xs text-green-600 font-medium">Après (avec tracking Abo) :</span>
+                                <pre className="bg-white border border-green-200 rounded p-2 mt-1 text-gray-700"><code>{`<button data-abo-track="export_pdf">Exporter en PDF</button>`}</code></pre>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-xs font-medium text-gray-700 mb-2">Code à ajouter pour tes features sélectionnées :</p>
+                          <div className="relative">
+                            <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                              <code>{Array.from(selectedFeatures).map(key => {
+                                const feat = allFeatures.find(f => f.feature_key === key);
+                                return `<button data-abo-track="${key}">${feat?.name || key}</button>`;
+                              }).join('\n')}</code>
+                            </pre>
+                            <button
+                              onClick={() => copyToClipboard(
+                                Array.from(selectedFeatures).map(key => {
+                                  const feat = allFeatures.find(f => f.feature_key === key);
+                                  return `data-abo-track="${key}"  <!-- ${feat?.name || key} -->`;
+                                }).join('\n'),
+                                'features-html'
+                              )}
+                              className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                            >
+                              {copiedSnippet === 'features-html' ? 'Copié !' : 'Copier'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Tu n{"'"}as pas besoin de copier les boutons entiers : ajoute juste <code className="bg-gray-100 px-1 rounded">data-abo-track=&quot;...&quot;</code> sur tes boutons/liens existants.
                           </p>
                         </div>
-                      </div>
-                    ) : (
+
+                        {/* ── Méthode 2 : JavaScript ── */}
+                        <details className="group mb-2">
+                          <summary className="flex items-center gap-2 cursor-pointer mb-2">
+                            <svg className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">Méthode 2</span>
+                            <span className="text-sm font-medium text-gray-700">Avec du JavaScript</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">pour développeurs</span>
+                          </summary>
+                          <div className="ml-6">
+                            <p className="text-sm text-gray-600 mb-2">
+                              Si tu préfères utiliser JavaScript (ou si l{"'"}action n{"'"}est pas un clic sur un bouton), appelle <code className="bg-gray-100 px-1 rounded text-xs font-mono">AboAnalytics.feature()</code> au moment où la feature est utilisée :
+                            </p>
+                            <div className="relative">
+                              <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-[13px] overflow-x-auto leading-relaxed">
+                                <code>{featureSnippet}</code>
+                              </pre>
+                              <button
+                                onClick={() => copyToClipboard(featureSnippet, 'features-js')}
+                                className="absolute top-3 right-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-md transition-colors"
+                              >
+                                {copiedSnippet === 'features-js' ? 'Copié !' : 'Copier'}
+                              </button>
+                            </div>
+                          </div>
+                        </details>
+                      </>
+                    )}
+
+                    {selectedFeatures.size === 0 && (
                       <p className="text-sm text-gray-400 italic">
-                        Sélectionne au moins une feature ci-dessus pour générer le code.
+                        Coche au moins une feature ci-dessus pour voir les instructions.
                       </p>
                     )}
                   </>
@@ -608,36 +729,12 @@ await fetch('${appUrl}/api/sdk/events', {
                         <p>
                           Commence par configurer tes produits et features dans le{' '}
                           <a href="/dashboard/brand-lab" className="underline font-medium hover:text-amber-900">Brand Lab</a>.
-                          Le SDK utilisera ces features pour le tracking.
+                          Tes agents pourront alors savoir quelles features chaque client utilise.
                         </p>
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* HTML attribute tracking */}
-                <div className="mt-4 border-t border-gray-100 pt-4">
-                  <details className="group">
-                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
-                      <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      Alternative sans code : tracking par attribut HTML
-                    </summary>
-                    <div className="mt-3 ml-6 text-sm text-gray-600">
-                      <p className="mb-2">
-                        Tu peux aussi tracker les clics sur des boutons <strong>sans écrire de JavaScript</strong>. Ajoute simplement l{"'"}attribut <code className="bg-gray-100 px-1 rounded text-xs font-mono">data-abo-track</code> sur n{"'"}importe quel bouton ou lien :
-                      </p>
-                      <div className="relative">
-                        <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 text-[13px] overflow-x-auto">
-                          <code>{`<!-- Le SDK détecte automatiquement les clics sur ces éléments -->
-<button data-abo-track="export_pdf">Exporter en PDF</button>
-<a data-abo-track="upgrade_pro" href="/pricing">Passer en Pro</a>`}</code>
-                        </pre>
-                      </div>
-                    </div>
-                  </details>
-                </div>
               </CardContent>
             </Card>
           </div>
