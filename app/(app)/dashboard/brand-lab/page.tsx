@@ -234,9 +234,31 @@ export default function BrandLabPage() {
         return;
       }
 
+      // Explicitly list columns to avoid sending extra fields (id, created_at)
       const settingsToSave = {
         user_id: user.id,
-        ...settings,
+        company_name: settings.company_name,
+        product_type: settings.product_type,
+        product_description: settings.product_description,
+        industry: settings.industry,
+        target_audience: settings.target_audience,
+        features: settings.features,
+        aha_moment_known: settings.aha_moment_known,
+        aha_moment_description: settings.aha_moment_description,
+        plans_metadata: settings.plans_metadata,
+        objectives: settings.objectives,
+        language: settings.language,
+        tone: settings.tone,
+        humor: settings.humor,
+        values: settings.values,
+        never_say: settings.never_say,
+        always_mention: settings.always_mention,
+        example_emails: settings.example_emails,
+        signature: settings.signature,
+        segmentation_enabled: settings.segmentation_enabled,
+        segments: settings.segments,
+        segment_by_ltv: settings.segment_by_ltv,
+        segment_by_plan: settings.segment_by_plan,
         updated_at: new Date().toISOString(),
       };
 
@@ -246,7 +268,7 @@ export default function BrandLabPage() {
 
       if (saveError) {
         console.error('Error saving settings:', saveError);
-        setError('Erreur lors de la sauvegarde');
+        setError(`Erreur lors de la sauvegarde : ${saveError.message || saveError.code || 'erreur inconnue'}`);
       } else {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);

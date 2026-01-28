@@ -173,7 +173,7 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Statut</p>
             <StatusBadge status={subscriber.subscription_status} />
@@ -181,6 +181,18 @@ export default function ClientDetailPage() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">MRR</p>
             <p className="text-xl font-bold text-gray-900">{formatCurrency(subscriber.mrr)}</p>
+          </div>
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-500 mb-1">Périodicité</p>
+            <p className="text-xl font-bold text-gray-900">
+              {subscriber.plan_interval === 'month' ? 'Mensuel' : subscriber.plan_interval === 'year' ? 'Annuel' : '-'}
+            </p>
+          </div>
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-500 mb-1">Prochain renouvellement</p>
+            <p className="text-xl font-bold text-gray-900">
+              {subscriber.current_period_end ? formatDate(subscriber.current_period_end, { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+            </p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Lifetime Value</p>
@@ -234,13 +246,15 @@ export default function ClientDetailPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-500">Periode: </span>
+                        <span className="text-gray-500">Période en cours : </span>
                         <span className="text-gray-900">
-                          {formatDate(sub.current_period_start)} → {formatDate(sub.current_period_end)}
+                          {sub.current_period_start && sub.current_period_end
+                            ? `${formatDate(sub.current_period_start, { day: 'numeric', month: 'short' })} → ${formatDate(sub.current_period_end, { day: 'numeric', month: 'short', year: 'numeric' })}`
+                            : 'Non disponible'}
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Renouvellement auto: </span>
+                        <span className="text-gray-500">Renouvellement auto : </span>
                         <span className="text-gray-900">{sub.cancel_at_period_end ? 'Non' : 'Oui'}</span>
                       </div>
                     </div>

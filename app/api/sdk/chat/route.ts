@@ -28,35 +28,37 @@ Coller UNE SEULE FOIS dans le fichier principal du site, avant </body> :
 
 Où coller selon la techno :
 - Next.js/React : layout.tsx (racine, dans le <body>)
-- WordPress : plugin WPCode (Header/Footer) ou footer.php
+- WordPress : télécharger le plugin WordPress depuis la page Intégrations (bouton "Plugin WordPress"). Il installe le SDK et identifie automatiquement les utilisateurs WordPress par email. Alternative : WPCode / footer.php.
 - HTML : template commun / footer.html
 - Shopify : theme.liquid avant </body>
 - Webflow : Project Settings > Custom Code > Footer
 - Wix : Velo Developer Mode > masterPage.js ou Custom Code
 
-La clé API (format abo_sk_...) est générée automatiquement dans la page Intégrations d'Abo. Elle est déjà pré-remplie dans le code affiché à l'utilisateur. Régénérable si besoin (invalidera l'ancienne).
+La clé API (format abo_sk_...) est générée automatiquement dans la page Intégrations d'Abo. Elle est déjà pré-remplie dans le code affiché. Si la clé n'apparaît pas, un bouton "Générer ma clé API" permet de la créer. Régénérable si besoin (invalidera l'ancienne).
 
 ÉTAPE 2 — IDENTIFICATION
-Pour relier le comportement à un client Stripe, appeler identify() après la connexion de l'utilisateur :
+Pour relier le comportement à un client Stripe, appeler identify() sur une page où l'utilisateur est connecté (tableau de bord, espace client, page profil). Il suffit qu'il s'exécute une seule fois.
 
 1. Par email (recommandé) : AboAnalytics.identify({ email: 'user@example.com' })
    → Se relie automatiquement au subscriber Stripe via l'email.
 2. Par Stripe Customer ID : AboAnalytics.identify({ stripeCustomerId: 'cus_xxx' })
 3. Par User ID custom : AboAnalytics.identify({ userId: 'id_123' })
 
-Appeler identify() après login, après inscription, ou à chaque page si l'utilisateur est déjà connecté. Sans identification, le SDK fonctionne en anonyme mais les agents ne pourront pas personnaliser.
+Sans identification, le SDK fonctionne en anonyme mais les agents ne pourront pas personnaliser. Note : le plugin WordPress fait l'identification automatiquement.
 
-ÉTAPE 3 — TRACKING DES FEATURES (optionnel)
-Signaler quand un utilisateur utilise une feature du produit :
+ÉTAPE 3 — TRACKING DES FEATURES (optionnel mais recommandé)
+Permet aux agents de savoir quelles features chaque client utilise (ou pas). Les features correspondent à celles du Brand Lab.
 
-JavaScript : AboAnalytics.feature('export_pdf')
-Avec données : AboAnalytics.feature('export_pdf', { format: 'pdf' })
+Méthode 1 — Sans code (la plus simple) :
+Ajouter l'attribut data-abo-track sur les boutons/liens existants :
+Avant : <button>Exporter en PDF</button>
+Après : <button data-abo-track="export_pdf">Exporter en PDF</button>
+Le SDK détecte automatiquement les clics. Pas besoin de JavaScript.
 
-Alternative sans code — attribut HTML :
-<button data-abo-track="export_pdf">Exporter</button>
-Le SDK détecte les clics automatiquement sur les éléments avec data-abo-track.
+Méthode 2 — JavaScript (pour développeurs) :
+AboAnalytics.feature('export_pdf')
 
-Les noms de features doivent correspondre aux feature_key du Brand Lab (section d'Abo où l'utilisateur configure produits, features et plans).
+Les feature_key (ex: export_pdf) doivent correspondre à ceux du Brand Lab.
 
 Événements custom : AboAnalytics.track('tutorial_completed', { step: 5 })
 
@@ -65,12 +67,12 @@ Envoyer des événements depuis Node.js via POST /api/sdk/events avec header x-a
 
 FAQ CONDENSÉE
 - Ralentissement ? Non, ~5KB, batch asynchrone.
-- Compatible WordPress/Shopify/etc ? Oui, c'est du JavaScript standard.
+- Compatible WordPress/Shopify/etc ? Oui. WordPress a un plugin dédié (téléchargeable depuis Intégrations). Pour les autres, c'est du JavaScript standard.
 - Sans identification ? Mode anonyme, les agents ne pourront pas personnaliser.
 - SDK obligatoire ? Non, mais sans lui les agents manquent de données comportementales.
 - RGPD ? Pas de cookies tiers, pas de fingerprinting, données sécurisées (Supabase RLS).
 - Brand Lab ? Section Abo pour configurer produits/features/plans. Les agents s'en servent pour personnaliser les emails.
-- Quoi dire au développeur ? 1) Installe le script dans le layout principal. 2) Appelle identify() avec l'email après login. 3) Optionnel : appelle feature() sur les features clés.
+- Quoi dire au développeur ? 1) Installe le script dans le layout principal (ou utilise le plugin WordPress). 2) Appelle identify() avec l'email sur les pages connectées. 3) Ajoute data-abo-track sur les boutons des features clés.
 
 RÈGLES
 - Français uniquement

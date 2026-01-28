@@ -382,7 +382,7 @@ export default function AgentConfigPage() {
 
       if (saveError) {
         console.error('Error saving config:', saveError);
-        setError('Erreur lors de la sauvegarde');
+        setError(`Erreur lors de la sauvegarde : ${saveError.message || saveError.code || 'erreur inconnue'}`);
       } else {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
