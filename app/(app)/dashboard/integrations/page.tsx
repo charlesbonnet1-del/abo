@@ -36,7 +36,7 @@ export default function IntegrationsPage() {
   // SDK state
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
-  const [apiKeyError, setApiKeyError] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState('');
   const [showBackend, setShowBackend] = useState(false);
@@ -81,14 +81,15 @@ export default function IntegrationsPage() {
         if (keyRes.ok) {
           const keyData = await keyRes.json();
           setApiKey(keyData.apiKey);
-          setApiKeyError(false);
+          setApiKeyError(null);
         } else {
-          console.error('API key fetch failed:', keyRes.status);
-          setApiKeyError(true);
+          const errData = await keyRes.json().catch(() => ({}));
+          console.error('API key fetch failed:', keyRes.status, errData);
+          setApiKeyError(errData.error || `Erreur ${keyRes.status}`);
         }
       } catch {
         console.error('API key fetch error');
-        setApiKeyError(true);
+        setApiKeyError('Erreur réseau');
       }
 
       // Load Brand Lab features
@@ -148,17 +149,18 @@ export default function IntegrationsPage() {
 
   const handleGenerateKey = async () => {
     setApiKeyLoading(true);
-    setApiKeyError(false);
+    setApiKeyError(null);
     try {
       const res = await fetch('/api/sdk/api-key');
       if (res.ok) {
         const data = await res.json();
         setApiKey(data.apiKey);
       } else {
-        setApiKeyError(true);
+        const errData = await res.json().catch(() => ({}));
+        setApiKeyError(errData.error || `Erreur ${res.status}`);
       }
     } catch {
-      setApiKeyError(true);
+      setApiKeyError('Erreur réseau');
     } finally {
       setApiKeyLoading(false);
     }
@@ -172,7 +174,10 @@ export default function IntegrationsPage() {
       if (res.ok) {
         const data = await res.json();
         setApiKey(data.apiKey);
-        setApiKeyError(false);
+        setApiKeyError(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setApiKeyError(errData.error || `Erreur ${res.status}`);
       }
     } catch (err) {
       console.error('Error regenerating key:', err);
@@ -424,7 +429,8 @@ await fetch('${appUrl}/api/sdk/events', {
                       </svg>
                       <div>
                         <p className="text-sm font-medium text-amber-800 mb-1">Clé API non disponible</p>
-                        <p className="text-sm text-amber-700 mb-3">La clé API n{"'"}a pas pu être générée. Clique ci-dessous pour réessayer.</p>
+                        <p className="text-sm text-amber-700 mb-1">{apiKeyError}</p>
+                        <p className="text-xs text-amber-600 mb-3">Clique ci-dessous pour réessayer.</p>
                         <Button onClick={handleGenerateKey} disabled={apiKeyLoading} variant="secondary" className="text-sm">
                           {apiKeyLoading ? 'Génération...' : 'Générer ma clé API'}
                         </Button>
