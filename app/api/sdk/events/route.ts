@@ -47,20 +47,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up user by API key
-    const { data: userData, error: userError } = await supabase
+    // Try user table first (fast O(1) lookup if sdk_api_key column exists)
+    let userId: string | null = null;
+
+    const { data: userData } = await supabase
       .from('user')
       .select('id')
       .eq('sdk_api_key', apiKey)
       .single();
 
-    if (userError || !userData) {
+    if (userData) {
+      userId = userData.id;
+    } else {
+      // Fallback: search auth.users metadata (handles case where column doesn't exist)
+      const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const matchedUser = listData?.users?.find(
+        (u) => u.user_metadata?.sdk_api_key === apiKey
+      );
+      if (matchedUser) {
+        userId = matchedUser.id;
+      }
+    }
+
+    if (!userId) {
       return NextResponse.json(
         { error: 'Invalid API key' },
         { status: 401, headers: corsHeaders(origin) }
       );
     }
-
-    const userId = userData.id;
 
     const body = await request.json();
     const events: SDKEvent[] = Array.isArray(body.events) ? body.events : [body];

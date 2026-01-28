@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import JSZip from 'jszip';
+import { randomBytes } from 'crypto';
 
 function generatePluginPhp(apiKey: string, endpoint: string): string {
   return `<?php
@@ -96,23 +97,32 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Get or generate API key
-  const { data } = await supabase
-    .from('user')
-    .select('sdk_api_key')
-    .eq('id', user.id)
-    .single();
-
-  let apiKey = data?.sdk_api_key;
+  // Read API key from auth metadata (source of truth)
+  let apiKey = user.user_metadata?.sdk_api_key;
 
   if (!apiKey) {
+    // Auto-generate via admin auth API
     const admin = createAdminClient();
     if (!admin) {
       return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
-    const { randomBytes } = await import('crypto');
     apiKey = `abo_sk_${randomBytes(32).toString('hex')}`;
-    await admin.from('user').update({ sdk_api_key: apiKey }).eq('id', user.id);
+
+    const { error: authError } = await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: { sdk_api_key: apiKey },
+    });
+
+    if (authError) {
+      console.error('Failed to save API key:', authError.message);
+      return NextResponse.json({ error: 'Impossible de générer la clé API' }, { status: 500 });
+    }
+
+    // Also try user table for reverse-lookup (ignore errors)
+    try {
+      await admin.from('user').update({ sdk_api_key: apiKey }).eq('id', user.id);
+    } catch {
+      // Column may not exist
+    }
   }
 
   const endpoint = `${process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 'https://abo-six.vercel.app'}/api/sdk/events`;
