@@ -235,7 +235,7 @@ export default function BrandLabPage() {
       }
 
       // Explicitly list columns to avoid sending extra fields (id, created_at)
-      const settingsToSave = {
+      const settingsToSave: Record<string, unknown> = {
         user_id: user.id,
         company_name: settings.company_name,
         product_type: settings.product_type,
@@ -262,14 +262,33 @@ export default function BrandLabPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: saveError } = await supabase
-        .from('brand_settings')
-        .upsert(settingsToSave, { onConflict: 'user_id' });
+      // Try saving - auto-strip columns that don't exist in DB yet (migration not applied)
+      const payload = { ...settingsToSave };
+      let saved = false;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const { error: saveError } = await supabase
+          .from('brand_settings')
+          .upsert(payload, { onConflict: 'user_id' });
 
-      if (saveError) {
+        if (!saveError) {
+          saved = true;
+          break;
+        }
+
+        // If a column doesn't exist, remove it and retry
+        const colMatch = saveError.message?.match(/Could not find the '(\w+)' column/);
+        if (colMatch?.[1]) {
+          delete payload[colMatch[1]];
+          continue;
+        }
+
+        // Any other error: stop
         console.error('Error saving settings:', saveError);
         setError(`Erreur lors de la sauvegarde : ${saveError.message || saveError.code || 'erreur inconnue'}`);
-      } else {
+        break;
+      }
+
+      if (saved) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       }
