@@ -63,6 +63,39 @@ interface Communication {
 
 type TabType = 'subscriptions' | 'payments' | 'communications';
 
+/**
+ * Calcule la prochaine date de renouvellement.
+ * Priorité : current_period_end > calcul depuis created_at + plan_interval
+ */
+function getNextRenewalDate(subscriber: Subscriber): Date | null {
+  if (subscriber.current_period_end) {
+    return new Date(subscriber.current_period_end);
+  }
+
+  // Fallback : calculer depuis la date de création + intervalle
+  if (!subscriber.created_at || !subscriber.plan_interval) return null;
+  if (subscriber.subscription_status === 'canceled') return null;
+
+  const start = new Date(subscriber.created_at);
+  const now = new Date();
+  const next = new Date(start);
+
+  // Avancer par intervalles jusqu'à dépasser aujourd'hui
+  if (subscriber.plan_interval === 'month') {
+    while (next <= now) {
+      next.setMonth(next.getMonth() + 1);
+    }
+  } else if (subscriber.plan_interval === 'year') {
+    while (next <= now) {
+      next.setFullYear(next.getFullYear() + 1);
+    }
+  } else {
+    return null;
+  }
+
+  return next;
+}
+
 export default function ClientDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -191,7 +224,10 @@ export default function ClientDetailPage() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Prochain renouvellement</p>
             <p className="text-xl font-bold text-gray-900">
-              {subscriber.current_period_end ? formatDate(subscriber.current_period_end, { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+              {(() => {
+                const renewal = getNextRenewalDate(subscriber);
+                return renewal ? formatDate(renewal.toISOString(), { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+              })()}
             </p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
@@ -248,9 +284,31 @@ export default function ClientDetailPage() {
                       <div>
                         <span className="text-gray-500">Période en cours : </span>
                         <span className="text-gray-900">
-                          {sub.current_period_start && sub.current_period_end
-                            ? `${formatDate(sub.current_period_start, { day: 'numeric', month: 'short' })} → ${formatDate(sub.current_period_end, { day: 'numeric', month: 'short', year: 'numeric' })}`
-                            : 'Non disponible'}
+                          {(() => {
+                            if (sub.current_period_start && sub.current_period_end) {
+                              return `${formatDate(sub.current_period_start, { day: 'numeric', month: 'short' })} → ${formatDate(sub.current_period_end, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                            }
+                            // Fallback : calculer depuis created_at + plan_interval
+                            if (sub.created_at && sub.plan_interval) {
+                              const start = new Date(sub.created_at);
+                              const now = new Date();
+                              const periodStart = new Date(start);
+                              if (sub.plan_interval === 'month') {
+                                while (new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, periodStart.getDate()) <= now) {
+                                  periodStart.setMonth(periodStart.getMonth() + 1);
+                                }
+                              } else if (sub.plan_interval === 'year') {
+                                while (new Date(periodStart.getFullYear() + 1, periodStart.getMonth(), periodStart.getDate()) <= now) {
+                                  periodStart.setFullYear(periodStart.getFullYear() + 1);
+                                }
+                              }
+                              const periodEnd = new Date(periodStart);
+                              if (sub.plan_interval === 'month') periodEnd.setMonth(periodEnd.getMonth() + 1);
+                              else if (sub.plan_interval === 'year') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+                              return `${formatDate(periodStart.toISOString(), { day: 'numeric', month: 'short' })} → ${formatDate(periodEnd.toISOString(), { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                            }
+                            return 'Non disponible';
+                          })()}
                         </span>
                       </div>
                       <div>
