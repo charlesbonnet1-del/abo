@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createOrchestrator, OrchestratorEvent } from '@/lib/agents/agents';
+import { createOrchestrator } from '@/lib/agents/agents';
 import { getUser } from '@/lib/supabase/server';
 import { validateBody, orchestratorEventSchema } from '@/lib/validation';
 

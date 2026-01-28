@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sdkEventsSchema, SDKEvent, validate } from '@/lib/validation';
-import { logger, ErrorCode } from '@/lib/errors';
-import { secureCompare } from '@/lib/security';
+import { logger } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   // CORS headers
