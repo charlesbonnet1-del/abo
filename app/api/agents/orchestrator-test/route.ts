@@ -1,35 +1,33 @@
 import { NextResponse } from 'next/server';
-import { createOrchestrator, OrchestratorEvent } from '@/lib/agents/agents';
+import { z } from 'zod';
+import { createOrchestrator } from '@/lib/agents/agents';
 import { getUser } from '@/lib/supabase/server';
+import { validateBody, orchestratorEventSchema } from '@/lib/validation';
+
+const orchestratorTestSchema = z.object({
+  userId: z.string().uuid('userId doit etre un UUID valide'),
+  event: orchestratorEventSchema,
+});
 
 export async function POST(request: Request) {
   try {
     // Vérifier l'authentification
     const authenticatedUser = await getUser();
     if (!authenticatedUser) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+      return NextResponse.json({ error: 'Non autorise' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { userId, event } = body as {
-      userId: string;
-      event: OrchestratorEvent;
-    };
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    // Valider le corps de la requête avec Zod
+    const validation = await validateBody(request, orchestratorTestSchema);
+    if ('error' in validation) {
+      return validation.error;
     }
+
+    const { userId, event } = validation.data;
 
     // Valider que l'utilisateur ne peut déclencher des actions que pour lui-même
     if (userId !== authenticatedUser.id) {
-      return NextResponse.json({ error: 'Non autorisé: userId ne correspond pas à l\'utilisateur connecté' }, { status: 403 });
-    }
-
-    if (!event || !event.type || !event.subscriberId) {
-      return NextResponse.json(
-        { error: 'event with type and subscriberId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Non autorise: userId ne correspond pas a l\'utilisateur connecte' }, { status: 403 });
     }
 
     // Créer l'orchestrateur avec admin client pour les tests
