@@ -183,7 +183,7 @@ export default function ClientDetailPage() {
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Subscriber non trouvé</h2>
-        <p className="text-gray-500 mb-4">Ce client n'existe pas ou vous n'y avez pas accès.</p>
+        <p className="text-gray-500 mb-4">Ce client n&apos;existe pas ou vous n&apos;y avez pas accès.</p>
         <Link href="/dashboard/clients" className="text-indigo-600 hover:text-indigo-700 font-medium">
           Retour à la liste des clients
         </Link>
