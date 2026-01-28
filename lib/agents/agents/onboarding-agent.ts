@@ -50,8 +50,8 @@ export class OnboardingAgent extends BaseAgent {
    */
   protected buildActionDescription(decision: ActionOption, situation: Situation): string {
     const subscriberName = situation.subscriber.name || situation.subscriber.email;
-    const step = situation.context.step as number || 1;
-    const totalSteps = situation.context.totalSteps as number || 3;
+    const step = (situation.context.step as number) ?? 1;
+    const totalSteps = (situation.context.totalSteps as number) ?? 3;
 
     if (decision.action === 'email') {
       if (step === 1) {
@@ -77,8 +77,8 @@ export class OnboardingAgent extends BaseAgent {
       const featuresResult = await getSubscriberFeatures(subscriberId);
 
       // Get context for email generation
-      const step = result.step as number || 1;
-      const totalSteps = result.total_steps as number || 3;
+      const step = (result.step as number) ?? 1;
+      const totalSteps = (result.total_steps as number) ?? 3;
 
       // Select feature for this step (if features are configured)
       const selectedFeature = this.selectFeatureForStep(step, totalSteps, featuresResult);
@@ -383,7 +383,7 @@ RÈGLES CRITIQUES:
       });
 
       const content = response.choices[0].message.content || '';
-      const match = content.match(/\{[\s\S]*\}/);
+      const match = content.match(/\{[\s\S]*?\}/);
       if (match) {
         return JSON.parse(match[0]);
       }

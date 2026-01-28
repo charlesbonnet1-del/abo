@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AgentIcon } from '@/components/ui/AgentIcon';
 import { TimeAgo } from '@/components/ui/TimeAgo';
 
-type AgentType = 'recovery' | 'retention' | 'conversion';
+type AgentType = 'recovery' | 'retention' | 'conversion' | 'onboarding';
 
 interface PendingAction {
   id: string;
@@ -46,7 +46,8 @@ interface PreviewModalProps {
 const agentLabels: Record<AgentType, string> = {
   recovery: 'Recovery Agent',
   retention: 'Retention Agent',
-  conversion: 'Conversion Agent'
+  conversion: 'Conversion Agent',
+  onboarding: 'Onboarding Agent'
 };
 
 const actionDescriptions: Record<string, string> = {

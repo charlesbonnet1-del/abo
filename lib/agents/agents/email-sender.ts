@@ -205,12 +205,19 @@ CONTEXTE : ${JSON.stringify(context || {})}
 OBJECTIF : Montrer la valeur et inciter à l'upgrade sans être pushy.`;
   }
 
+  if (agentType === 'onboarding') {
+    return `Rédige un email d'onboarding pour accueillir un nouveau client.
+CLIENT : ${name}
+CONTEXTE : ${JSON.stringify(context || {})}
+OBJECTIF : Accueillir chaleureusement et guider dans les premiers pas.`;
+  }
+
   return `Rédige un email professionnel pour ${name}.`;
 }
 
 function parseEmailResponse(content: string): { subject: string; body: string } {
   try {
-    const match = content.match(/\{[\s\S]*\}/);
+    const match = content.match(/\{[\s\S]*?\}/);
     if (match) {
       return JSON.parse(match[0]);
     }
@@ -257,6 +264,17 @@ function getDefaultEmail(
       body: `<p>Bonjour ${name},</p>
 <p>Vous utilisez notre version gratuite depuis un moment maintenant.</p>
 <p>Saviez-vous que notre version premium vous offre encore plus de fonctionnalités pour booster votre productivité ?</p>
+<p>Cordialement,<br>L'équipe</p>`,
+    };
+  }
+
+  if (agentType === 'onboarding') {
+    return {
+      subject: 'Bienvenue ! Vos premiers pas',
+      body: `<p>Bonjour ${name},</p>
+<p>Bienvenue et merci de nous avoir choisis !</p>
+<p>Nous sommes ravis de vous compter parmi nous. N'hésitez pas à explorer toutes les fonctionnalités disponibles.</p>
+<p>Si vous avez des questions, nous sommes là pour vous aider.</p>
 <p>Cordialement,<br>L'équipe</p>`,
     };
   }

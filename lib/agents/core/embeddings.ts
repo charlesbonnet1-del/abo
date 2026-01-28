@@ -192,6 +192,11 @@ export function cosineSimilarity(a: number[], b: number[]): number {
     normB += b[i] * b[i];
   }
 
+  // Guard contre la division par zéro (vecteur tout-zéro)
+  if (normA === 0 || normB === 0) {
+    return 0;
+  }
+
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
