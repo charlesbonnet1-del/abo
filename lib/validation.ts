@@ -23,7 +23,7 @@ export type AgentType = z.infer<typeof agentTypeSchema>;
 export const orchestratorEventSchema = z.object({
   type: z.string().min(1),
   subscriberId: z.string().min(1),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type OrchestratorEventInput = z.infer<typeof orchestratorEventSchema>;
@@ -33,7 +33,7 @@ export type OrchestratorEventInput = z.infer<typeof orchestratorEventSchema>;
 export const sdkEventSchema = z.object({
   type: z.string().min(1),
   name: z.string().optional(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
   url: z.string().url().optional(),
   title: z.string().optional(),
   path: z.string().optional(),
@@ -66,9 +66,9 @@ export const agentConfigUpdateSchema = z.object({
   is_active: z.boolean().optional(),
   confidence_level: z.enum(['review_all', 'auto_with_copy', 'full_auto']).optional(),
   strategy_template: z.string().optional(),
-  strategy_config: z.record(z.unknown()).optional(),
-  offers_config: z.record(z.unknown()).optional(),
-  limits_config: z.record(z.unknown()).optional(),
+  strategy_config: z.record(z.string(), z.unknown()).optional(),
+  offers_config: z.record(z.string(), z.unknown()).optional(),
+  limits_config: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ── Product/Feature Schemas ──
