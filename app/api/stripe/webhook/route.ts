@@ -353,9 +353,11 @@ export async function POST(request: NextRequest) {
             });
 
           // Update subscription table status to past_due
-          const subscriptionId = typeof invoice.subscription === 'string'
-            ? invoice.subscription
-            : invoice.subscription?.id;
+          // invoice.subscription renamed in Stripe API 2025 - use unknown cast like existing code
+          const invoiceSubscription = (invoice as unknown as { subscription?: string | { id: string } }).subscription;
+          const subscriptionId = typeof invoiceSubscription === 'string'
+            ? invoiceSubscription
+            : invoiceSubscription?.id;
 
           if (subscriptionId) {
             await supabase
