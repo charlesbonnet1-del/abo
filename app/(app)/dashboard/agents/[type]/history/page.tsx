@@ -35,9 +35,17 @@ interface Stats {
   pending: number;
 }
 
+interface AgentCommunication {
+  subject: string;
+  content: string;
+  channel: string;
+  sent_at: string;
+}
+
 interface ActionModalData {
   action: AgentAction;
   isOpen: boolean;
+  communication?: AgentCommunication | null;
 }
 
 const actionLabels: Record<string, string> = {
@@ -438,7 +446,19 @@ export default function AgentHistoryPage() {
                               </span>
                               {action.status !== 'pending_approval' && (
                                 <button
-                                  onClick={() => setModal({ action, isOpen: true })}
+                                  onClick={async () => {
+                                    setModal({ action, isOpen: true });
+                                    const supabase = createClient();
+                                    if (!supabase) return;
+                                    const { data } = await supabase
+                                      .from('agent_communication')
+                                      .select('subject, content, channel, sent_at')
+                                      .eq('action_id', action.id)
+                                      .order('sent_at', { ascending: false })
+                                      .limit(1)
+                                      .maybeSingle();
+                                    setModal({ action, isOpen: true, communication: data });
+                                  }}
                                   className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                                 >
                                   Voir details
@@ -522,6 +542,22 @@ export default function AgentHistoryPage() {
                     <p className="text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
                       {modal.action.description}
                     </p>
+                  </div>
+                )}
+
+                {modal.communication && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Email envoyé via Resend</p>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                        <p className="text-xs text-gray-500">Objet</p>
+                        <p className="text-sm font-medium text-gray-900">{modal.communication.subject}</p>
+                      </div>
+                      <div
+                        className="p-3 text-sm max-h-64 overflow-y-auto"
+                        dangerouslySetInnerHTML={{ __html: modal.communication.content }}
+                      />
+                    </div>
                   </div>
                 )}
 
