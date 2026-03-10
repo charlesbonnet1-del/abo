@@ -255,7 +255,8 @@ export async function POST(request: NextRequest) {
       // =====================
       // INVOICE EVENTS
       // =====================
-      case 'invoice.paid': {
+      case 'invoice.paid':
+      case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
         if (!userId) break;
 
