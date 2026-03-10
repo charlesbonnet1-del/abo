@@ -352,12 +352,26 @@ export async function POST(request: NextRequest) {
               onConflict: 'subscriber_id,stripe_invoice_id',
             });
 
-          // Update subscriber's last payment status
+          // Update subscription table status to past_due
+          const subscriptionId = typeof invoice.subscription === 'string'
+            ? invoice.subscription
+            : invoice.subscription?.id;
+
+          if (subscriptionId) {
+            await supabase
+              .from('subscription')
+              .update({ status: 'past_due' })
+              .eq('subscriber_id', subscriber.id)
+              .eq('stripe_subscription_id', subscriptionId);
+          }
+
+          // Update subscriber's last payment status and subscription_status
           await supabase
             .from('subscriber')
             .update({
               last_payment_at: new Date().toISOString(),
               last_payment_status: 'failed',
+              subscription_status: 'past_due',
               updated_at: new Date().toISOString(),
             })
             .eq('id', subscriber.id);
